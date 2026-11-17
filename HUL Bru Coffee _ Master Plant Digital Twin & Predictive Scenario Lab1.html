@@ -1,0 +1,2227 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HUL Bru Coffee | Master Plant Digital Twin & Predictive Scenario Lab</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <!-- Three.js r128 & OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <!-- Tween.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            hul: { navy: '#001b44', blue: '#005ee5', cyan: '#06b6d4', dark: '#04070e' }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+    
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #03060c;
+      color: #f1f5f9;
+      user-select: none;
+    }
+
+    #webgl-container {
+      position: absolute;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+    }
+
+    .hud-panel {
+      background: rgba(9, 14, 26, 0.84);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65);
+    }
+
+    .hud-layer {
+      position: absolute;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .hud-layer > * {
+      pointer-events: auto;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+    ::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.4); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(56, 189, 248, 0.7); }
+
+    /* CCTV Scanline overlay */
+    .cctv-scanlines {
+      background: linear-gradient(
+        rgba(18, 16, 16, 0) 50%, 
+        rgba(0, 0, 0, 0.35) 50%
+      ), linear-gradient(
+        90deg,
+        rgba(255, 0, 0, 0.03),
+        rgba(0, 255, 0, 0.01),
+        rgba(0, 0, 255, 0.03)
+      );
+      background-size: 100% 3px, 6px 100%;
+    }
+
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.08); opacity: 0.4; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .pulse-indicator {
+      animation: pulse-ring 2s infinite ease-in-out;
+    }
+
+    /* ISA-101 style: grey = normal, colour = abnormal (rose/amber stay) */
+    .hud-panel{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:rgba(11,17,28,.95)!important}
+    .text-\[8px\],.text-\[9px\]{font-size:11px!important}.text-\[10px\]{font-size:12px!important}.text-\[11px\]{font-size:12.5px!important}
+    .text-slate-500{color:#94a3b8!important}.text-slate-400{color:#a8b5c8!important}
+    [class*="text-emerald-"],[class*="text-cyan-"],[class*="text-blue-"],[class*="text-sky-"],[class*="text-indigo-"],[class*="text-teal-"],[class*="text-orange-"],[class*="text-purple-"]{color:#cbd5e1!important}
+    [class*="bg-emerald-"],[class*="bg-cyan-"],[class*="bg-purple-"],[class*="bg-sky-"],[class*="bg-teal-"],[class*="bg-indigo-"],[class*="bg-blue-"]:not(button){background-color:rgba(148,163,184,.14)!important}
+    [class*="bg-emerald-4"],[class*="bg-cyan-4"]{background-color:#94a3b8!important}
+    [class*="border-emerald-"],[class*="border-cyan-"],[class*="border-blue-"],[class*="border-purple-"],[class*="border-sky-"],[class*="border-teal-"],[class*="border-indigo-"]{border-color:rgba(148,163,184,.35)!important}
+    [class*="border-l-purple"],[class*="border-l-emerald"],[class*="border-l-blue"],[class*="border-l-amber"]{border-left-color:#475569!important}
+    .bg-gradient-to-r[class*="from-emerald"],.bg-gradient-to-r[class*="from-cyan"],.bg-gradient-to-r[class*="from-amber"]{background-image:none!important;background-color:#7c8aa0!important}
+    nav button{color:#cbd5e1!important}
+    #kpi-oee,#kpi-throughput,#kpi-agv-wait{font-size:1.4rem!important}
+    #cctv-cam-1,#cctv-cam-3,#cctv-cam-4{filter:saturate(.55) contrast(1.15) brightness(1.5)}
+    #cctv-cam-2{filter:grayscale(1) sepia(1) saturate(4) hue-rotate(-25deg) brightness(1.5)}
+    @media (prefers-reduced-motion: reduce){.animate-pulse,.animate-ping,.pulse-indicator{animation:none!important}}
+  </style>
+</head>
+<body class="font-sans text-xs antialiased">
+
+  <!-- 3D WebGL Viewport -->
+  <div id="webgl-container"></div>
+
+  <!-- =====================================================================
+       1. TOP COMMAND & REAL-TIME KPI BAR (OEE, Throughput, ESG, 5S)
+  ====================================================================== -->
+  <header class="hud-layer top-0 left-0 right-0 p-2.5 flex flex-wrap items-center justify-between gap-2">
+    <!-- Brand & Twin Identity -->
+    <div class="hud-panel px-3.5 py-2 rounded-xl flex items-center gap-3 border-l-4 border-l-blue-500">
+      <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-600 via-blue-800 to-slate-900 flex flex-col items-center justify-center font-black text-amber-300 border border-blue-400/40 shadow-[0_0_15px_rgba(37,99,235,0.5)]">
+        <span class="text-xs leading-none">HUL</span>
+        <span class="text-[8px] text-cyan-200 font-mono tracking-tighter">BRU</span>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-xs sm:text-sm font-extrabold tracking-wider text-white uppercase">Bru Coffee Master Digital Twin</h1>
+          <span id="sim-status-badge" class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-mono px-1.5 py-0.5 rounded flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> SEEDED DES · 10-SEED MEAN
+          </span>
+        </div>
+        <p class="text-[10px] text-slate-400 font-mono">300m×200m Mega-Plant • Seed <span class="text-cyan-400">0x8F3A</span> • Procedural Three.js model</p>
+      </div>
+    </div>
+
+    <!-- Center-Right Live Plant KPIs, ESG & Lean 5S -->
+    <div class="hud-panel px-3 py-1.5 rounded-xl flex flex-wrap items-center gap-3 xl:gap-5 font-mono">
+      <!-- OEE -->
+      <div class="group relative cursor-pointer" onclick="openComparisonModal()">
+        <div class="text-[9px] text-slate-400 uppercase flex items-center gap-1">
+          Plant OEE <i data-lucide="info" class="w-2.5 h-2.5 text-slate-500"></i>
+        </div>
+        <div class="flex items-baseline gap-1.5">
+          <span id="kpi-oee" class="text-base font-extrabold text-cyan-400">78.4%</span>
+          <span id="kpi-oee-delta" class="text-[9px] text-slate-400">A:90% P:89% Q:98%</span>
+        </div>
+      </div>
+
+      <div class="h-7 w-px bg-slate-800"></div>
+
+      <!-- Throughput -->
+      <div>
+        <div class="text-[9px] text-slate-400 uppercase">Throughput (Jars/Hr)</div>
+        <div class="flex items-baseline gap-1.5">
+          <span id="kpi-throughput" class="text-base font-extrabold text-emerald-400">14,200</span>
+          <span id="kpi-throughput-target" class="text-[9px] text-slate-400">/ 14,200 tgt</span>
+        </div>
+      </div>
+
+      <div class="h-7 w-px bg-slate-800"></div>
+
+      <!-- AGV Aisle Wait & Node 4 -->
+      <div>
+        <div class="text-[9px] text-slate-400 uppercase">AGV Aisle Wait / Util</div>
+        <div class="flex items-baseline gap-1.5">
+          <span id="kpi-agv-wait" class="text-base font-extrabold text-blue-400">4.2s</span>
+          <span id="kpi-agv-util" class="text-[9px] text-slate-400">(68% util)</span>
+        </div>
+      </div>
+
+      <div class="h-7 w-px bg-slate-800"></div>
+
+      <!-- ESG: Carbon & Water ZLD -->
+      <div>
+        <div class="text-[9px] text-emerald-400/90 uppercase flex items-center gap-1">
+          <i data-lucide="leaf" class="w-2.5 h-2.5"></i> ESG Carbon / Water ZLD
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span id="kpi-carbon" class="text-sm font-bold text-emerald-300">1.14 <span class="text-[9px] font-normal">kgCO₂e/kg</span></span>
+          <span class="text-slate-600">|</span>
+          <span id="kpi-water" class="text-sm font-bold text-cyan-300">94.8% <span class="text-[9px] font-normal">ZLD</span></span>
+        </div>
+      </div>
+
+      <div class="h-7 w-px bg-slate-800"></div>
+
+      <!-- Lean 5S & CI Score -->
+      <div>
+        <div class="text-[9px] text-amber-400/90 uppercase flex items-center gap-1">
+          <i data-lucide="award" class="w-2.5 h-2.5"></i> Lean 5S / Blocked Aisles
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span id="kpi-5s-score" class="text-sm font-bold text-emerald-400">96.5%</span>
+          <span id="kpi-5s-incidents" class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700/50">0 Violations</span>
+        </div>
+      </div>
+
+      <!-- Comparison Matrix Trigger -->
+      <button onclick="openComparisonModal()" class="bg-blue-600/25 hover:bg-blue-600/40 text-blue-200 border border-blue-500/40 px-2.5 py-1.5 rounded-lg text-[10px] font-sans font-semibold flex items-center gap-1.5 transition shadow-sm">
+        <i data-lucide="table-2" class="w-3.5 h-3.5 text-cyan-400"></i> Surge Matrix
+      </button><button onclick="toggleDocks()" title="Hide side docks (F)" class="px-2.5 py-1.5 rounded-lg text-[10px] font-sans font-semibold bg-slate-800 text-slate-200 border border-slate-600">Focus 3D</button><button id="plan-btn" onclick="togglePlan()" class="px-2.5 py-1.5 rounded-lg text-[10px] font-sans font-semibold bg-slate-800 text-slate-200 border border-slate-600">Plan view</button><button onclick="rcaOpen()" class="px-2.5 py-1.5 rounded-lg text-[10px] font-sans font-semibold bg-slate-800 text-slate-200 border border-slate-600">RCA Lab</button>
+    </div>
+  </header>
+
+  <!-- =====================================================================
+       2. LEFT DOCK: PLANT MANAGER SCENARIO LAB, CAMERA MODES & ESG/5S AUDIT
+  ====================================================================== -->
+  <aside class="hud-layer top-20 left-2.5 bottom-14 w-80 flex flex-col gap-2.5 overflow-y-auto pr-1">
+    
+    <!-- Plant Manager Predictive Scenario Lab -->
+    <div class="hud-panel p-3 rounded-xl border-l-4 border-l-purple-500">
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-1.5 text-white font-bold uppercase tracking-wider text-[11px]">
+          <i data-lucide="sliders" class="w-3.5 h-3.5 text-purple-400"></i> Plant Manager Scenario Lab
+        </div>
+        <span id="replay-badge" class="text-[9px] font-mono bg-purple-950/80 text-purple-300 px-1.5 py-0.5 rounded border border-purple-700/50">72h Fast-Sim</span>
+      </div>
+      <p class="text-[10px] text-slate-400 mb-2.5 leading-snug">
+        Stress-test the facility against customer demand spikes and validate Zero-Capex Kaizen routing before physical execution.
+      </p>
+
+      <div class="space-y-1.5 font-mono text-[10px]">
+        <!-- Mode 1: Baseline -->
+        <button id="btn-scen-baseline" onclick="setScenario('baseline')" class="w-full text-left p-2 rounded-lg border transition flex items-center justify-between bg-blue-600/25 border-blue-500 text-white">
+          <div>
+            <div class="font-bold flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-cyan-400"></span> 1. Standard Baseline (100%)
+            </div>
+            <div class="text-[9px] text-slate-300 pl-3.5"><span id="sub-baseline">computing…</span></div>
+          </div>
+          <i data-lucide="check-circle-2" class="w-4 h-4 text-cyan-400 shrink-0"></i>
+        </button>
+
+        <!-- Mode 2: +40% Surge Bi-Directional -->
+        <button id="btn-scen-surge" onclick="setScenario('surge_bidir')" class="w-full text-left p-2 rounded-lg border transition flex items-center justify-between bg-slate-900/70 border-slate-700/80 text-slate-300 hover:bg-slate-800/80">
+          <div>
+            <div class="font-bold text-amber-300 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-amber-400"></span> 2. +40% Demand Surge (Bi-Dir)
+            </div>
+            <div class="text-[9px] text-slate-400 pl-3.5"><span id="sub-surge_bidir">computing…</span></div>
+          </div>
+          <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400 shrink-0"></i>
+        </button>
+
+        <!-- Mode 3: +40% Surge + One-Way Loop Kaizen -->
+        <button id="btn-scen-kaizen" onclick="setScenario('surge_oneway')" class="w-full text-left p-2 rounded-lg border transition flex items-center justify-between bg-slate-900/70 border-slate-700/80 text-slate-300 hover:bg-slate-800/80">
+          <div>
+            <div class="font-bold text-emerald-300 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span> 3. +40% Surge + One-Way Kaizen
+            </div>
+            <div class="text-[9px] text-slate-400 pl-3.5"><span id="sub-surge_oneway">computing…</span></div>
+          </div>
+          <i data-lucide="zap" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+        </button>
+      </div>
+
+      <!-- One-Way Route Graph Quick Toggle & Fault Injectors -->
+      <div class="mt-2.5 pt-2.5 border-t border-slate-800 flex items-center justify-between">
+        <span class="text-[10px] font-mono text-slate-300 flex items-center gap-1.5">
+          <i data-lucide="git-fork" class="w-3.5 h-3.5 text-emerald-400"></i> One-Way AGV Loop Kaizen
+        </span>
+        <button id="toggle-oneway-btn" onclick="toggleOneWayKaizen()" class="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700 transition">
+          OFF (BI-DIR)
+        </button>
+      </div>
+
+      <!-- Equipment Fault Injectors -->
+      <div class="mt-2 pt-2 border-t border-slate-800/80">
+        <div class="text-[9px] uppercase font-bold text-slate-400 mb-1.5 flex items-center justify-between">
+          <span>Physical Anomaly Injectors</span>
+          <button onclick="clearFaults()" class="text-[9px] text-cyan-400 hover:underline font-mono">Reset All</button>
+        </div>
+        <div class="grid grid-cols-3 gap-1 font-mono text-[9px]">
+          <button id="fault-roaster" onclick="injectFault('roaster')" class="p-1.5 rounded bg-slate-900 hover:bg-rose-950/60 border border-slate-700 hover:border-rose-500/50 text-slate-300 transition text-center">
+            🔥 Roaster Temp
+          </button>
+          <button id="fault-hex" onclick="injectFault('hex')" class="p-1.5 rounded bg-slate-900 hover:bg-amber-950/60 border border-slate-700 hover:border-amber-500/50 text-slate-300 transition text-center">
+            🌡️ HEX Fouling
+          </button>
+          <button id="fault-pack" onclick="injectFault('pack')" class="p-1.5 rounded bg-slate-900 hover:bg-amber-950/60 border border-slate-700 hover:border-amber-500/50 text-slate-300 transition text-center">
+            📦 Pack Jam
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cinematic Camera Modes & Spatial Layers -->
+    <div class="hud-panel p-3 rounded-xl">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-[11px] font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
+          <i data-lucide="compass" class="w-3.5 h-3.5 text-cyan-400"></i> Camera & Spatial Layers
+        </span>
+        <span id="active-cam-label" class="text-[9px] font-mono text-cyan-400">HELICOPTER</span>
+      </div>
+
+      <div class="grid grid-cols-3 gap-1.5 font-mono text-[10px] mb-2.5">
+        <button id="cam-btn-heli" onclick="setCameraMode('heli')" class="p-2 rounded-lg bg-cyan-500/20 border border-cyan-500/50 text-cyan-200 flex flex-col items-center gap-1 transition">
+          <i data-lucide="plane" class="w-4 h-4"></i> Heli Orbit
+        </button>
+        <button id="cam-btn-walk" onclick="setCameraMode('walk')" class="p-2 rounded-lg bg-slate-900/80 border border-slate-700 text-slate-300 hover:bg-slate-800 flex flex-col items-center gap-1 transition">
+          <i data-lucide="footprints" class="w-4 h-4"></i> Walkthrough
+        </button>
+        <button id="cam-btn-free" onclick="setCameraMode('free')" class="p-2 rounded-lg bg-slate-900/80 border border-slate-700 text-slate-300 hover:bg-slate-800 flex flex-col items-center gap-1 transition">
+          <i data-lucide="move-3d" class="w-4 h-4"></i> Free Inspect
+        </button>
+      </div>
+
+      <!-- 3D Visual Layer Toggles -->
+      <div class="grid grid-cols-2 gap-1.5 font-mono text-[9px]">
+        <button id="layer-routes" onclick="toggleLayer('routes')" class="px-2 py-1.5 rounded bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 flex items-center justify-between">
+          <span>AGV Route Graph</span> <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        </button>
+        <button id="layer-5s" onclick="toggleLayer('zones5s')" class="px-2 py-1.5 rounded bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 flex items-center justify-between">
+          <span>5S Polygons</span> <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        </button>
+        <button id="layer-thermal" onclick="toggleLayer('thermal')" class="px-2 py-1.5 rounded bg-slate-900 border border-slate-700 text-slate-400 flex items-center justify-between">
+          <span>Thermal Plumes</span> <span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span>
+        </button>
+        <button id="layer-shell" onclick="toggleLayer('shell')" class="px-2 py-1.5 rounded bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 flex items-center justify-between">
+          <span>X-Ray Structural</span> <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="hud-panel p-3 rounded-xl border-l-4 border-l-rose-500"><div class="flex items-center justify-between mb-1"><span class="text-[11px] font-bold uppercase tracking-wider text-white">Alarm Summary</span><button onclick="ackAlarm(-1)" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 border border-slate-600 text-slate-200">ACK ALL</button></div><div id="alm-head" class="text-[11px] font-mono text-slate-400 mb-1.5"></div><div id="alm-rows" class="space-y-0.5 font-mono text-[11px]"></div></div>
+<div class="hud-panel p-3 rounded-xl border-l-4 border-l-amber-500">
+<div class="flex items-center justify-between mb-2"><span class="text-[11px] font-bold uppercase tracking-wider text-white">☕ Cup &amp; Roast Quality Gates</span><span class="text-[8px] font-mono text-amber-300 bg-amber-950/70 px-1.5 py-0.5 rounded border border-amber-700/40">SIM · PLACEHOLDER LIMITS</span></div>
+<div id="q-batch" class="mb-2"></div><div id="q-rows" class="space-y-1 font-mono text-[10px]"></div>
+<p class="text-[9px] text-slate-500 mt-2 leading-snug">Fault injectors drive these gates. Replace limits with the QA spec and values with LIMS/PLC tags.</p></div>
+    <!-- ESG, Water Circularity (ZLD) & Lean 5S Breakdown -->
+    <div class="hud-panel p-3 rounded-xl border-l-4 border-l-emerald-500">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-[11px] font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
+          <i data-lucide="recycle" class="w-3.5 h-3.5 text-emerald-400"></i> ESG, ZLD Water & 5S Matrix
+        </span>
+        <span class="text-[9px] font-mono text-emerald-400">ISO 14001 TARGET</span>
+      </div>
+
+      <!-- ESG Progress Bars -->
+      <div class="space-y-2 font-mono text-[10px] mb-3">
+        <div>
+          <div class="flex justify-between mb-0.5">
+            <span class="text-slate-400">Scope 1+2 Carbon (Biomass CHP)</span>
+            <span id="esg-carbon-detail" class="text-emerald-300 font-bold">1.14 kgCO₂e/kg (-18%)</span>
+          </div>
+          <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+            <div id="esg-carbon-bar" class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full w-[82%] transition-all"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-0.5">
+            <span class="text-slate-400">RO / MVR Evaporator ZLD Water</span>
+            <span id="esg-water-detail" class="text-cyan-300 font-bold">94.8% Recycled (248 kL/d)</span>
+          </div>
+          <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+            <div class="bg-gradient-to-r from-cyan-500 to-blue-400 h-full w-[95%] transition-all"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex justify-between mb-0.5">
+            <span class="text-slate-400">HEX Heat Recovery Efficiency</span>
+            <span id="esg-hex-detail" class="text-amber-300 font-bold">91.2% (3.65 GJ/t)</span>
+          </div>
+          <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+            <div id="esg-hex-bar" class="bg-gradient-to-r from-amber-500 to-yellow-400 h-full w-[91%] transition-all"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5S Pillars -->
+      <div class="text-[9px] text-slate-400 uppercase font-bold mb-1">Lean 5S Real-Time Zone Audit</div>
+      <div class="grid grid-cols-5 gap-1 text-center font-mono text-[9px]">
+        <div class="bg-slate-900/90 p-1.5 rounded border-b-2 border-emerald-500">
+          <div id="s5-sort" class="text-emerald-400 font-bold text-xs">98%</div>
+          <div class="text-[8px] text-slate-400">1.Sort</div>
+        </div>
+        <div id="s5-set-box" class="bg-slate-900/90 p-1.5 rounded border-b-2 border-emerald-500">
+          <div id="s5-set" class="text-emerald-400 font-bold text-xs">96%</div>
+          <div class="text-[8px] text-slate-400">2.Set</div>
+        </div>
+        <div id="s5-shine-box" class="bg-slate-900/90 p-1.5 rounded border-b-2 border-emerald-500">
+          <div id="s5-shine" class="text-emerald-400 font-bold text-xs">95%</div>
+          <div class="text-[8px] text-slate-400">3.Shine</div>
+        </div>
+        <div class="bg-slate-900/90 p-1.5 rounded border-b-2 border-emerald-500">
+          <div id="s5-std" class="text-emerald-400 font-bold text-xs">97%</div>
+          <div class="text-[8px] text-slate-400">4.Std</div>
+        </div>
+        <div class="bg-slate-900/90 p-1.5 rounded border-b-2 border-emerald-500">
+          <div id="s5-sus" class="text-emerald-400 font-bold text-xs">96%</div>
+          <div class="text-[8px] text-slate-400">5.Sust</div>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- =====================================================================
+       3. RIGHT DOCK: VIRTUAL CCTV WALL (YOLO CV) & GROUNDED AI COPILOT
+  ====================================================================== -->
+  <aside class="hud-layer top-20 right-2.5 bottom-14 w-96 flex flex-col gap-2.5 overflow-hidden">
+    
+    <!-- Virtual CCTV Video Wall with Live Edge CV (YOLO Bounding Boxes) -->
+    <div class="hud-panel p-3 rounded-xl flex flex-col shrink-0">
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-white">
+          <i data-lucide="cctv" class="w-3.5 h-3.5 text-rose-400"></i> Virtual CCTV · Simulated Edge CV
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="text-[9px] font-mono text-emerald-400 bg-emerald-950/70 px-1.5 py-0.5 rounded border border-emerald-700/40">3D CAMS · PROJECTED BOXES</span>
+          <button onclick="toggleCctvWall()" class="text-slate-400 hover:text-white p-0.5" title="Minimize/Expand CCTV">
+            <i data-lucide="minimize-2" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+
+      <div id="cctv-grid-container" class="grid grid-cols-2 gap-1.5">
+        <!-- CAM 1: Roasting & Cyclone -->
+        <div onclick="inspectAsset('ROASTER-01')" class="relative rounded-lg overflow-hidden border border-slate-700 bg-slate-950 h-24 cursor-pointer group">
+          <canvas id="cctv-cam-1" width="220" height="120" class="w-full h-full object-cover"></canvas>
+          <div class="cctv-scanlines absolute inset-0 pointer-events-none"></div>
+          <div class="absolute top-1 left-1.5 right-1.5 flex justify-between items-center text-[8px] font-mono text-slate-200 bg-black/50 px-1 rounded">
+            <span>CAM-ROAST-01</span>
+            <span id="cctv-1-badge" class="text-emerald-400">● PPE OK</span>
+          </div>
+        </div>
+
+        <!-- CAM 2: Heat Exchanger & Evaporator Skid -->
+        <div onclick="inspectAsset('HEX-SKID-01')" class="relative rounded-lg overflow-hidden border border-slate-700 bg-slate-950 h-24 cursor-pointer group">
+          <canvas id="cctv-cam-2" width="220" height="120" class="w-full h-full object-cover"></canvas>
+          <div class="cctv-scanlines absolute inset-0 pointer-events-none"></div>
+          <div class="absolute top-1 left-1.5 right-1.5 flex justify-between items-center text-[8px] font-mono text-slate-200 bg-black/50 px-1 rounded">
+            <span>CAM-HEX-02 (IR)</span>
+            <span id="cctv-2-badge" class="text-cyan-400">● 88.5°C</span>
+          </div>
+        </div>
+
+        <!-- CAM 3: High-Speed Jar Packaging Line -->
+        <div onclick="inspectAsset('PACK-LINE-01')" class="relative rounded-lg overflow-hidden border border-slate-700 bg-slate-950 h-24 cursor-pointer group">
+          <canvas id="cctv-cam-3" width="220" height="120" class="w-full h-full object-cover"></canvas>
+          <div class="cctv-scanlines absolute inset-0 pointer-events-none"></div>
+          <div class="absolute top-1 left-1.5 right-1.5 flex justify-between items-center text-[8px] font-mono text-slate-200 bg-black/50 px-1 rounded">
+            <span>CAM-PACK-03</span>
+            <span id="cctv-3-badge" class="text-emerald-400">● HAIRNET 100%</span>
+          </div>
+        </div>
+
+        <!-- CAM 4: Warehouse Arterial Node 4 -->
+        <div onclick="flyToZone('warehouse')" class="relative rounded-lg overflow-hidden border border-slate-700 bg-slate-950 h-24 cursor-pointer group">
+          <canvas id="cctv-cam-4" width="220" height="120" class="w-full h-full object-cover"></canvas>
+          <div class="cctv-scanlines absolute inset-0 pointer-events-none"></div>
+          <div class="absolute top-1 left-1.5 right-1.5 flex justify-between items-center text-[8px] font-mono text-slate-200 bg-black/50 px-1 rounded">
+            <span>CAM-WH-NODE4</span>
+            <span id="cctv-4-badge" class="text-emerald-400">● FLOW CLEAR</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Grounded HUL Industrial AI Copilot -->
+    <div class="hud-panel rounded-xl flex-1 flex flex-col overflow-hidden border border-blue-500/30">
+      <div class="p-2.5 border-b border-slate-800 bg-gradient-to-r from-blue-950/60 to-slate-900/60 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-6 h-6 rounded-md bg-blue-600/30 border border-blue-400/50 flex items-center justify-center">
+            <i data-lucide="bot" class="w-3.5 h-3.5 text-cyan-300"></i>
+          </div>
+          <div>
+            <div class="text-[11px] font-bold text-white uppercase tracking-wider">Bru Operations AI Copilot</div>
+            <div class="text-[9px] text-cyan-400 font-mono">Rule-based • answers from live twin KPIs</div>
+          </div>
+        </div>
+        <button onclick="openComparisonModal()" class="text-[9px] font-mono px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600">
+          Report
+        </button>
+      </div>
+
+      <!-- Copilot Chat Messages -->
+      <div id="copilot-messages" class="flex-1 p-3 overflow-y-auto space-y-2.5 font-sans text-[11px]">
+        <!-- Initial grounded message -->
+        <div class="bg-slate-900/90 border border-slate-700/80 rounded-lg p-2.5 text-slate-200 leading-relaxed">
+          <div class="flex items-center gap-1.5 text-[9px] font-mono text-cyan-400 mb-1">
+            <i data-lucide="terminal" class="w-3 h-3"></i> [system: ready] • 8 Zones & 12,400 WIP Entities Synced
+          </div>
+          Welcome, Plant Manager. The 300m×200m Bru Coffee Digital Twin is running at <strong>14,200 Jars/hr</strong> (OEE <strong>78.4%</strong>). Use the quick-action chips below to stress-test customer demand surges, apply the <strong>One-Way AGV Route Kaizen</strong>, or audit the Heat Exchangers and Powerplant.
+        </div>
+      </div>
+
+      <!-- Quick-Action Plant Manager Chips -->
+      <div class="px-2.5 py-1.5 bg-slate-950/70 border-t border-slate-800/80 flex flex-wrap gap-1">
+        <button onclick="askCopilot('surge')" class="text-[9px] font-mono px-2 py-1 rounded bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition">
+          ⚡ +40% Surge Bottleneck
+        </button>
+        <button onclick="askCopilot('kaizen')" class="text-[9px] font-mono px-2 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 transition">
+          🔄 Apply One-Way Kaizen
+        </button>
+        <button onclick="askCopilot('hex')" class="text-[9px] font-mono px-2 py-1 rounded bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 transition">
+          🌡️ Audit HEX & Powerplant
+        </button>
+        <button onclick="askCopilot('esg')" class="text-[9px] font-mono px-2 py-1 rounded bg-purple-500/15 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 transition">
+          🌿 ESG, ZLD & 5S Report
+        </button>
+      </div>
+
+      <!-- Chat Input Form -->
+      <form onsubmit="handleCopilotSubmit(event)" class="p-2 bg-slate-950 border-t border-slate-800 flex gap-1.5">
+        <input id="copilot-input" type="text" placeholder="Ask about OEE, Node 4 AGVs, HEX fouling, ZLD water..." class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-[11px] text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-sans" />
+        <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg font-semibold text-[11px] flex items-center gap-1 transition">
+          <i data-lucide="send" class="w-3.5 h-3.5"></i>
+        </button>
+      </form>
+    </div>
+
+  </aside>
+
+  <!-- =====================================================================
+       4. BOTTOM FAST-TRAVEL ZONE TELEPORTATION BAR
+  ====================================================================== -->
+  <div id="rca" class="hidden fixed inset-0 z-50 bg-slate-950 overflow-auto p-3 text-slate-200 text-[12px] font-sans">
+ <div class="flex flex-wrap items-center gap-2 mb-2"><b class="text-sm">RCA Lab · P&amp;ID → simulation → fishbone</b>
+  <input type="file" id="rca-file" accept="image/*,.json" class="text-[11px] max-w-[11rem]">
+  <button class="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-200" onclick="rcaDemo()">Bru demo</button>
+  <select id="rca-mode" class="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-200" onchange="RG.mode=this.value;RG.src=null"><option value="sel">Edit MTBF/MTTR</option><option value="node">Add node</option><option value="link">Link nodes</option><option value="del">Delete node</option></select>
+  <select id="rca-type" class="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-200"><option value="source">Source</option><option value="tank">Tank/Silo</option><option value="pump">Pump</option><option value="hex">Heat exch.</option><option value="vessel">Vessel</option><option value="valve">Valve</option><option value="inst">Instrument</option><option value="pack">Packer</option><option value="sink">Sink</option></select>
+  <button class="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-200" onclick="rcaRun()">Run simulation</button><button class="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-200" onclick="rcaClose()">Close</button></div>
+ <p class="text-slate-400 mb-1">Upload a P&amp;ID image (PNG/JPG) and trace it: add nodes, link them in flow order (Source → … → Sink), and link each instrument to the unit it trips. Or load a graph JSON. The drawing is not read automatically. MTBF/MTTR are generic placeholders until you replace them with CMMS data.</p>
+ <svg id="rca-svg" viewBox="0 0 800 420" class="w-full max-w-4xl bg-slate-900 border border-slate-700 rounded"></svg>
+ <div id="rca-out" class="max-w-4xl"></div></div>
+ <div id="plan-overlay" class="hud-layer inset-0 hidden"></div>
+  <div class="hud-layer bottom-16 left-0 right-0 flex justify-center"><div class="hud-panel rounded-xl px-3 py-1.5 flex items-center gap-2 font-mono text-[12px]">
+    <button id="tc-play" onclick="setPause()" class="px-2 py-0.5 rounded bg-slate-800 border border-slate-600 text-slate-200">Pause</button>
+    <button id="tc-1" onclick="setSpeed(1)">1×</button><button id="tc-10" onclick="setSpeed(10)">10×</button><button id="tc-30" onclick="setSpeed(30)">30×</button><button id="tc-120" onclick="setSpeed(120)">120×</button>
+    <input id="scrub" type="range" min="0" max="3599" step="1" value="0" class="w-40" oninput="simClk=+this.value" onpointerdown="scrubbing=true" onpointerup="scrubbing=false">
+    <span id="tc-time" class="text-slate-300 w-16">T+00:00</span>
+    <button onclick="nextBlock()" class="px-2 py-0.5 rounded bg-slate-800 border border-slate-600 text-slate-200">Next jam</button>
+  </div></div>
+  <nav class="hud-layer bottom-2.5 left-2.5 right-2.5 flex justify-center">
+    <div class="hud-panel px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 overflow-x-auto max-w-full font-mono text-[10px]">
+      <span class="text-[9px] text-slate-400 uppercase font-bold px-1.5 flex items-center gap-1 shrink-0">
+        <i data-lucide="map-pin" class="w-3 h-3 text-cyan-400"></i> Plant Zones:
+      </span>
+      <button onclick="flyToZone('overview')" class="px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-blue-600/40 text-slate-200 border border-slate-700 shrink-0 transition">
+        0. Full Mega-Plant
+      </button>
+      <button onclick="flyToZone('silos')" class="px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-blue-600/40 text-emerald-300 border border-slate-800 shrink-0 transition">
+        1. Green Bean Silos
+      </button>
+      <button onclick="flyToZone('roasting')" class="px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-blue-600/40 text-amber-300 border border-slate-800 shrink-0 transition">
+        2. Drum Roasters
+      </button>
+      <button onclick="flyToZone('extraction')" class="px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-blue-600/40 text-orange-300 border border-slate-800 shrink-0 transition">
+        3. Extraction Battery
+      </button>
+      <button onclick="flyToZone('hex')" class="px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-blue-600/40 text-cyan-300 border border-slate-800 shrink-0 transition">
+        4. Heat Exchangers & Evap
+      </button>
+      <button onclick="flyToZone('dryer')" class="px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-blue-600/40 text-sky-300 border border-slate-800 shrink-0 transition">
+        5. 45m Spray Dryer
+      </button>
+      <button onclick="flyToZone('packaging')" class="px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-blue-600/40 text-indigo-300 border border-slate-800 shrink-0 transition">
+        6. Jar Packaging
+      </button>
+      <button onclick="flyToZone('warehouse')" class="px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-blue-600/40 text-purple-300 border border-slate-800 shrink-0 transition">
+        7. Automated Warehouse
+      </button>
+      <button onclick="flyToZone('powerplant')" class="px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-blue-600/40 text-teal-300 border border-slate-800 shrink-0 transition">
+        8. CHP Powerplant & ZLD
+      </button>
+    </div>
+  </nav>
+
+  <!-- =====================================================================
+       5. DEEP EQUIPMENT TELEMETRY & PREDICTIVE MAINTENANCE DRAWER
+  ====================================================================== -->
+  <div id="telemetry-drawer" class="hud-layer top-20 left-80 ml-3 w-96 hud-panel rounded-xl p-4 hidden border border-cyan-500/40 shadow-2xl">
+    <div class="flex items-start justify-between border-b border-slate-800 pb-2.5 mb-3">
+      <div>
+        <div class="flex items-center gap-2">
+          <span id="tel-asset-id" class="text-xs font-extrabold font-mono text-cyan-400">HEX-SKID-01</span>
+          <span id="tel-asset-status" class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">RUNNING</span>
+        </div>
+        <h3 id="tel-asset-name" class="text-sm font-bold text-white mt-0.5">Plate & Shell Heat Exchanger Network</h3>
+      </div>
+      <button onclick="closeTelemetryDrawer()" class="text-slate-400 hover:text-white p-1">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <!-- Key Live Sensor Readouts -->
+    <div class="grid grid-cols-3 gap-2 font-mono text-[10px] mb-3">
+      <div class="bg-slate-900/90 p-2 rounded-lg border border-slate-800">
+        <div id="tel-metric1-label" class="text-[9px] text-slate-400">Process Temp</div>
+        <div id="tel-metric1-val" class="text-sm font-bold text-amber-400 mt-0.5">184.2 °C</div>
+      </div>
+      <div class="bg-slate-900/90 p-2 rounded-lg border border-slate-800">
+        <div id="tel-metric2-label" class="text-[9px] text-slate-400">Vibration RMS</div>
+        <div id="tel-metric2-val" class="text-sm font-bold text-cyan-400 mt-0.5">2.14 mm/s</div>
+      </div>
+      <div class="bg-slate-900/90 p-2 rounded-lg border border-slate-800">
+        <div id="tel-metric3-label" class="text-[9px] text-slate-400">Pred. RUL</div>
+        <div id="tel-metric3-val" class="text-sm font-bold text-emerald-400 mt-0.5">412 hrs</div>
+      </div>
+    </div>
+
+    <!-- Live Chart.js Telemetry Canvas -->
+    <div class="bg-slate-950/80 p-2 rounded-lg border border-slate-800 mb-3">
+      <div class="flex justify-between items-center text-[9px] font-mono text-slate-400 mb-1">
+        <span>Real-Time PLC Telemetry & RUL Degradation</span>
+        <span class="text-cyan-400">1 Hz Stream</span>
+      </div>
+      <div class="h-36">
+        <canvas id="telemetry-chart"></canvas>
+      </div>
+    </div>
+
+    <!-- Asset Specs & SAP PM Work Order Action -->
+    <div class="space-y-1.5 font-mono text-[10px] mb-3 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80">
+      <div class="flex justify-between"><span class="text-slate-400">MTBF / MTTR:</span><span id="tel-mtbf" class="text-slate-200">320 hrs / 45 mins</span></div>
+      <div class="flex justify-between"><span class="text-slate-400">Energy / Steam Load:</span><span id="tel-power" class="text-amber-300">420 kW (1.8 t/hr Steam)</span></div>
+      <div class="flex justify-between"><span class="text-slate-400">AI Anomaly Score:</span><span id="tel-anomaly" class="text-emerald-400">0.08 (Normal Operating Envelope)</span></div>
+    </div>
+
+    <div class="flex gap-2">
+      <button onclick="dispatchWorkOrder()" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-3 rounded-lg text-[11px] flex items-center justify-center gap-1.5 transition shadow">
+        <i data-lucide="wrench" class="w-3.5 h-3.5"></i> Queue PM Work Order (draft)
+      </button>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       6. SURGE COMPARISON MATRIX MODAL (BASELINE VS BI-DIR VS ONE-WAY KAIZEN)
+  ====================================================================== -->
+  <div id="comparison-modal" class="hud-layer inset-0 bg-black/75 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="hud-panel max-w-3xl w-full rounded-2xl p-5 border border-blue-500/40 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+        <div>
+          <span class="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-blue-600/30 text-cyan-300 border border-blue-500/40">Computed Scenario Lab Readout</span>
+          <h2 class="text-base font-extrabold text-white mt-1">72-Hour Accelerated Simulation: +40% Demand Surge & AGV Route Kaizen</h2>
+        </div>
+        <button onclick="closeComparisonModal()" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse font-mono text-[11px]">
+          <thead>
+            <tr class="border-b border-slate-700 text-slate-300 bg-slate-900/90">
+              <th class="p-2.5">Key Performance Metric</th>
+              <th class="p-2.5">1. Baseline (100%)</th>
+              <th class="p-2.5 text-amber-300">2. +40% Surge (Bi-Dir)</th>
+              <th class="p-2.5 text-emerald-300">3. +40% Surge (One-Way Loop)</th>
+              <th class="p-2.5 text-cyan-300">0. Baseline + One-Way</th><th class="p-2.5">Δ One-Way vs Bi-Dir (+40%)</th>
+            </tr>
+          </thead>
+          <tbody id="matrix-body" class="divide-y divide-slate-800/80 text-slate-200"></tbody>
+        </table>
+      </div>
+
+      <div id="waterfall" class="mt-3 space-y-1"></div>
+      <div class="mt-4 flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-800">
+        <div class="text-[11px] text-slate-400">
+          Clicking <strong>Apply One-Way Loop Kaizen</strong> immediately reconfigures the 3D AGV route graph and resolves Node 4 congestion.<br><span class="text-amber-300">Basis: 72h DES, 10 seeds from 0x8F3A, mean ± 95% CI. Models packaging → Node 4 → ASRS flow only. Ideal rate, switchover time and fleet size are assumptions (see SIM).</span>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="setScenario('surge_bidir'); closeComparisonModal();" class="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-semibold text-xs">
+            View Bi-Dir Bottleneck
+          </button>
+          <button onclick="setScenario('surge_oneway'); closeComparisonModal();" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow">
+            Apply One-Way Loop Kaizen
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MAIN APPLICATION & 3D PROCEDURAL DIGITAL TWIN SCRIPT
+  ====================================================================== -->
+  <script>
+    lucide.createIcons();
+
+    // ---------------------------------------------------------------------
+    // 1. GLOBAL SIMULATION STATE & ASSET REGISTRY
+    // ---------------------------------------------------------------------
+    const simState = {
+      scenario: 'baseline',     // 'baseline' | 'surge_bidir' | 'surge_oneway'
+      oneWayLoop: false,
+      cameraMode: 'heli',       // 'heli' | 'walk' | 'free'
+      layers: {
+        routes: true,
+        zones5s: true,
+        thermal: false,
+        shell: true
+      },
+      faults: {
+        roaster: false,
+        hex: false,
+        pack: false
+      },
+      kpis: {
+        oee: 78.4,
+        throughput: 14200,
+        target: 14200,
+        agvWait: 4.2,
+        agvUtil: 68,
+        carbon: 1.14,
+        waterZld: 94.8,
+        score5s: 96.5,
+        violations5s: 0
+      },
+      selectedAsset: 'HEX-SKID-01'
+    };
+
+    const assetDatabase = {
+      'SILO-FARM-01': {
+        name: 'Green Bean & Chicory Silo Complex (6x 500t)',
+        status: 'RUNNING',
+        m1Label: 'Bean Moisture', m1Val: '10.4 %',
+        m2Label: 'Elevator Vib', m2Val: '1.62 mm/s',
+        m3Label: 'Pred. RUL', m3Val: '890 hrs',
+        mtbf: '600 hrs / 30 mins',
+        power: '185 kW (Pneumatic Conveyance)',
+        anomaly: '0.03 (Nominal)',
+        series: [10.3, 10.4, 10.4, 10.5, 10.4, 10.3, 10.4, 10.4]
+      },
+      'ROASTER-01': {
+        name: 'Neuhaus Neotec Rotating Drum Roaster #1',
+        status: 'RUNNING',
+        m1Label: 'Roast Gas Temp', m1Val: '214.5 °C',
+        m2Label: 'Drum Bearing RMS', m2Val: '2.45 mm/s',
+        m3Label: 'Pred. RUL', m3Val: '340 hrs',
+        mtbf: '240 hrs / 60 mins',
+        power: '640 kW (Biomass Gas Fired)',
+        anomaly: '0.11 (Normal Thermal Profile)',
+        series: [212, 213, 215, 214, 214.5, 215, 214.2, 214.5]
+      },
+      'EXTRACTOR-01': {
+        name: 'Counter-Current Extraction Battery (8 Columns)',
+        status: 'RUNNING',
+        m1Label: 'Column Pressure', m1Val: '16.8 bar',
+        m2Label: 'Liquor Brix', m2Val: '26.4 °Bx',
+        m3Label: 'Pred. RUL', m3Val: '520 hrs',
+        mtbf: '450 hrs / 90 mins',
+        power: '510 kW (High-Pressure Hot Water)',
+        anomaly: '0.05 (Optimal Yield)',
+        series: [16.5, 16.7, 16.8, 16.9, 16.8, 16.7, 16.8, 16.8]
+      },
+      'HEX-SKID-01': {
+        name: 'Shell-and-Tube & PHE Heat Exchanger + 3-Effect Evap',
+        status: 'RUNNING',
+        m1Label: 'HEX Outlet Temp', m1Val: '88.5 °C',
+        m2Label: 'Diff Pressure ΔP', m2Val: '0.42 bar',
+        m3Label: 'Pred. RUL', m3Val: '412 hrs',
+        mtbf: '320 hrs / 45 mins',
+        power: '420 kW (91.2% Heat Recovery)',
+        anomaly: '0.08 (Clean Tubes - No Fouling)',
+        series: [88.1, 88.3, 88.5, 88.4, 88.6, 88.5, 88.4, 88.5]
+      },
+      'DRYER-TOWER-01': {
+        name: '45m Tall-Form Spray Drying & Agglomeration Tower',
+        status: 'RUNNING',
+        m1Label: 'Inlet Air Temp', m1Val: '248.0 °C',
+        m2Label: 'Atomizer RPM', m2Val: '14,200 rpm',
+        m3Label: 'Pred. RUL', m3Val: '285 hrs',
+        mtbf: '210 hrs / 75 mins',
+        power: '1,150 kW (Primary Thermal Consumer)',
+        anomaly: '0.09 (Bulk Density 230 g/L)',
+        series: [247, 248, 248.5, 247.8, 248, 248.2, 248, 248]
+      },
+      'PACK-LINE-01': {
+        name: 'High-Speed Bru Glass Jar & Sachet Line #1',
+        status: 'RUNNING',
+        m1Label: 'Line Speed', m1Val: '240 jars/m',
+        m2Label: 'Capper Torque', m2Val: '1.85 Nm',
+        m3Label: 'Pred. RUL', m3Val: '610 hrs',
+        mtbf: '180 hrs / 20 mins',
+        power: '210 kW (Servo Synchronized)',
+        anomaly: '0.04 (99.4% First-Pass Yield)',
+        series: [238, 240, 241, 240, 239, 240, 240, 240]
+      },
+      'WAREHOUSE-ASRS': {
+        name: 'High-Bay Automated Storage & AGV Node 4 Hub',
+        status: 'RUNNING',
+        m1Label: 'Rack Occupancy', m1Val: '84.2 %',
+        m2Label: 'Node 4 Wait', m2Val: '4.2 sec',
+        m3Label: 'Fleet Health', m3Val: '98.0 %',
+        mtbf: '720 hrs / 15 mins',
+        power: '145 kW (Regenerative Braking)',
+        anomaly: '0.06 (Space-Time Table Nominal)',
+        series: [4.1, 4.3, 4.0, 4.2, 4.4, 4.1, 4.2, 4.2]
+      },
+      'POWERPLANT-CHP': {
+        name: 'Biomass Co-Gen Powerplant & ZLD Water Recycling',
+        status: 'RUNNING',
+        m1Label: 'Steam Gen', m1Val: '28.5 t/hr',
+        m2Label: 'ZLD Recovery', m2Val: '94.8 %',
+        m3Label: 'Turbine RUL', m3Val: '1,420 hrs',
+        mtbf: '1,200 hrs / 4 hrs',
+        power: '14.2 MW Generated (Spent Grounds Fuel)',
+        anomaly: '0.02 (Nominal)',
+        series: [94.5, 94.6, 94.7, 94.8, 94.8, 94.9, 94.8, 94.8]
+      }
+    };
+
+    // ---------------------------------------------------------------------
+    // 2. THREE.JS MASSIVE 300m x 200m FACTORY SCENE INITIALIZATION
+    // ---------------------------------------------------------------------
+    const container = document.getElementById('webgl-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x030711);
+    scene.fog = new THREE.FogExp2(0x030711, 0.0022);
+
+    const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.5, 1500);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.maxPolarAngle = Math.PI / 2 - 0.015;
+    controls.minDistance = 8;
+    controls.maxDistance = 420;
+
+    // Lighting
+    const hemiLight = new THREE.HemisphereLight(0x93c5fd, 0x0f172a, 0.65);
+    scene.add(hemiLight);
+
+    const dirLight = new THREE.DirectionalLight(0xfff7ed, 1.15);
+    dirLight.position.set(120, 180, 90);
+    dirLight.castShadow = true;
+    dirLight.shadow.camera.left = -180;
+    dirLight.shadow.camera.right = 180;
+    dirLight.shadow.camera.top = 140;
+    dirLight.shadow.camera.bottom = -140;
+    dirLight.shadow.camera.near = 10;
+    dirLight.shadow.camera.far = 450;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    scene.add(dirLight);
+
+    // Shared PBR Materials
+    const mats = {
+      floor: new THREE.MeshStandardMaterial({ color: 0x0b1324, roughness: 0.6, metalness: 0.15 }),
+      steel: new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.28, metalness: 0.82 }),
+      darkSteel: new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.45, metalness: 0.7 }),
+      copper: new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.3, metalness: 0.75 }),
+      roasterGlow: new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0xea580c, emissiveIntensity: 0.7, roughness: 0.3 }),
+      hexBlue: new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.3, metalness: 0.6 }),
+      hexRed: new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.3, metalness: 0.6 }),
+      hulBlue: new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.4, metalness: 0.3 }),
+      bruGold: new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.35, metalness: 0.4 }),
+      carton: new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.8, metalness: 0.05 }),
+      rackOrange: new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.4, metalness: 0.5 }),
+      rackBlue: new THREE.MeshStandardMaterial({ color: 0x1e40af, roughness: 0.5, metalness: 0.5 }),
+      waterCyan: new THREE.MeshStandardMaterial({ color: 0x06b6d4, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.78 }),
+      solarPanel: new THREE.MeshStandardMaterial({ color: 0x1e3a8a, roughness: 0.2, metalness: 0.8 })
+    };
+
+    // Interactive Raycasting Registry
+    const clickableMeshes = [];
+    function registerClickable(mesh, assetId) {
+      mesh.userData.assetId = assetId;
+      clickableMeshes.push(mesh);
+    }
+
+    // Layer Groups
+    const routeGraphGroup = new THREE.Group();
+    const zones5sGroup = new THREE.Group();
+    const thermalPlumeGroup = new THREE.Group();
+    thermalPlumeGroup.visible = false;
+    const shellGroup = new THREE.Group();
+    scene.add(routeGraphGroup, zones5sGroup, thermalPlumeGroup, shellGroup);
+
+    // ---------------------------------------------------------------------
+    // 3. BUILD FLOOR, X-RAY SHELL, 5S POLYGONS & ROUTE GRAPH
+    // ---------------------------------------------------------------------
+    // Epoxy Factory Floor (320m x 220m)
+    const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(340, 230), mats.floor);
+    floorMesh.rotation.x = -Math.PI / 2;
+    floorMesh.receiveShadow = true;
+    scene.add(floorMesh);
+
+    const floorGrid = new THREE.GridHelper(340, 68, 0x1e3a8a, 0x111c35);
+    floorGrid.position.y = 0.05;
+    scene.add(floorGrid);
+
+    // X-Ray Megastructure Trusses & Glass Envelope
+    function buildFactoryShell() {
+      const shellBox = new THREE.Mesh(
+        new THREE.BoxGeometry(290, 48, 185),
+        new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.07 })
+      );
+      shellBox.position.set(0, 24, 0);
+      shellGroup.add(shellBox);
+
+      // Structural Columns along perimeter
+      const colGeo = new THREE.BoxGeometry(1.2, 48, 1.2);
+      for (let x = -140; x <= 140; x += 35) {
+        [-90, 90].forEach(z => {
+          const col = new THREE.Mesh(colGeo, mats.darkSteel);
+          col.position.set(x, 24, z);
+          shellGroup.add(col);
+        });
+      }
+    }
+    buildFactoryShell();
+
+    // 5S Zone Footprint Polygons on Floor
+    const zoneDefinitions = [
+      { name: 'Z1: SILOS', x: -115, z: -45, w: 45, d: 65, color: 0x10b981 },
+      { name: 'Z2: ROASTING', x: -60, z: -45, w: 42, d: 65, color: 0xf59e0b },
+      { name: 'Z3: EXTRACTION', x: -10, z: -45, w: 42, d: 65, color: 0xf97316 },
+      { name: 'Z4: HEAT EXCHANGERS', x: -10, z: 35, w: 48, d: 55, color: 0x06b6d4 },
+      { name: 'Z5: SPRAY DRYING', x: 42, z: -35, w: 42, d: 75, color: 0x38bdf8 },
+      { name: 'Z6: PACKAGING', x: 42, z: 45, w: 45, d: 55, color: 0x6366f1 },
+      { name: 'Z7: AUTOMATED WAREHOUSE', x: 105, z: 10, w: 62, d: 145, color: 0xa855f7 },
+      { name: 'Z8: CHP POWERPLANT & ZLD', x: -95, z: 45, w: 75, d: 65, color: 0x14b8a6 }
+    ];
+
+    const blockedClutterMeshes = []; // Shown during Bi-Dir Surge bottleneck
+
+    zoneDefinitions.forEach(z => {
+      const borderGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(z.w, 0.2, z.d));
+      const borderMat = new THREE.LineBasicMaterial({ color: z.color, transparent: true, opacity: 0.7 });
+      const border = new THREE.LineSegments(borderGeo, borderMat);
+      border.position.set(z.x, 0.15, z.z);
+      zones5sGroup.add(border);
+
+      const pad = new THREE.Mesh(
+        new THREE.PlaneGeometry(z.w, z.d),
+        new THREE.MeshBasicMaterial({ color: z.color, transparent: true, opacity: 0.05, side: THREE.DoubleSide })
+      );
+      pad.rotation.x = -Math.PI / 2;
+      pad.position.set(z.x, 0.08, z.z);
+      zones5sGroup.add(pad);
+    });
+
+    // ---------------------------------------------------------------------
+    // 4. BUILD ALL 8 INDUSTRIAL PLANT ZONES
+    // ---------------------------------------------------------------------
+    const roasterDrums = [];
+    const steamParticles = [];
+    const jarInstances = [];
+    let roasterFaultLight = null;
+    let hexFaultLight = null;
+
+    // ZONE 1: GREEN BEAN SILO FARM (-115, -45)
+    function buildSiloFarm() {
+      const group = new THREE.Group();
+      group.position.set(-115, 0, -45);
+      const siloGeo = new THREE.CylinderGeometry(6.5, 6.5, 34, 28);
+      const coneGeo = new THREE.ConeGeometry(6.8, 4.5, 28);
+
+      for (let r = 0; r < 2; r++) {
+        for (let c = 0; c < 3; c++) {
+          const x = (c - 1) * 16;
+          const z = (r - 0.5) * 20;
+          const silo = new THREE.Mesh(siloGeo, mats.steel);
+          silo.position.set(x, 19, z);
+          silo.castShadow = true;
+          registerClickable(silo, 'SILO-FARM-01');
+          group.add(silo);
+
+          const roof = new THREE.Mesh(coneGeo, mats.darkSteel);
+          roof.position.set(x, 38.2, z);
+          group.add(roof);
+        }
+      }
+      // Top Overhead Conveyor Bridge
+      const bridge = new THREE.Mesh(new THREE.BoxGeometry(42, 2.2, 3), mats.hulBlue);
+      bridge.position.set(0, 39, 0);
+      group.add(bridge);
+      scene.add(group);
+    }
+
+    // ZONE 2: INDUSTRIAL ROASTING & AROMA RECOVERY (-60, -45)
+    function buildRoastingZone() {
+      const group = new THREE.Group();
+      group.position.set(-60, 0, -45);
+
+      for (let i = 0; i < 3; i++) {
+        const z = (i - 1) * 20;
+        // Roaster Housing Base
+        const base = new THREE.Mesh(new THREE.BoxGeometry(14, 4, 9), mats.darkSteel);
+        base.position.set(0, 2, z);
+        group.add(base);
+
+        // Rotating Thermal Drum
+        const drum = new THREE.Mesh(new THREE.CylinderGeometry(3.8, 3.8, 11, 24), mats.roasterGlow);
+        drum.rotation.z = Math.PI / 2;
+        drum.position.set(0, 6.8, z);
+        drum.castShadow = true;
+        registerClickable(drum, 'ROASTER-01');
+        group.add(drum);
+        roasterDrums.push(drum);
+
+        // Cooling Tray & Cyclone
+        const tray = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 4.5, 2.2, 24), mats.steel);
+        tray.position.set(11, 1.2, z);
+        group.add(tray);
+
+        const cyclone = new THREE.Mesh(new THREE.ConeGeometry(2.2, 9, 16), mats.copper);
+        cyclone.rotation.x = Math.PI;
+        cyclone.position.set(-9, 10, z);
+        group.add(cyclone);
+      }
+
+      roasterFaultLight = new THREE.PointLight(0xffaa00, 1.5, 35);
+      roasterFaultLight.position.set(0, 14, 0);
+      group.add(roasterFaultLight);
+
+      // Thermal Plume Cylinder
+      const plume = new THREE.Mesh(
+        new THREE.CylinderGeometry(14, 18, 28, 24),
+        new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.22, depthWrite: false })
+      );
+      plume.position.set(-60, 14, -45);
+      thermalPlumeGroup.add(plume);
+
+      scene.add(group);
+    }
+
+    // ZONE 3: COUNTER-CURRENT EXTRACTION BATTERY (-10, -45)
+    function buildExtractionBattery() {
+      const group = new THREE.Group();
+      group.position.set(-10, 0, -45);
+
+      const colGeo = new THREE.CylinderGeometry(2.2, 2.2, 22, 20);
+      for (let i = 0; i < 8; i++) {
+        const x = (i % 4 - 1.5) * 9;
+        const z = (Math.floor(i / 4) - 0.5) * 16;
+        const autoclave = new THREE.Mesh(colGeo, mats.steel);
+        autoclave.position.set(x, 11, z);
+        autoclave.castShadow = true;
+        registerClickable(autoclave, 'EXTRACTOR-01');
+        group.add(autoclave);
+
+        const dome = new THREE.Mesh(new THREE.SphereGeometry(2.2, 16, 12), mats.copper);
+        dome.position.set(x, 22, z);
+        group.add(dome);
+      }
+
+      // Interconnecting Manifold Pipe
+      const manifold = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 32, 12), mats.copper);
+      manifold.rotation.z = Math.PI / 2;
+      manifold.position.set(0, 19, 0);
+      group.add(manifold);
+
+      scene.add(group);
+    }
+
+    // ZONE 4: HEAT EXCHANGERS (SHELL & TUBE, PHE) & EVAPORATORS (-10, 35)
+    function buildHeatExchangerNetwork() {
+      const group = new THREE.Group();
+      group.position.set(-10, 0, 35);
+
+      // 4 Horizontal Shell-and-Tube Heat Exchangers
+      const shellGeo = new THREE.CylinderGeometry(2.1, 2.1, 16, 20);
+      for (let i = 0; i < 4; i++) {
+        const z = (i - 1.5) * 8;
+        const hex = new THREE.Mesh(shellGeo, i % 2 === 0 ? mats.hexRed : mats.hexBlue);
+        hex.rotation.z = Math.PI / 2;
+        hex.position.set(-8, 4.5 + (i % 2) * 4, z);
+        hex.castShadow = true;
+        registerClickable(hex, 'HEX-SKID-01');
+        group.add(hex);
+      }
+
+      // Plate Heat Exchanger (PHE) Skid
+      const pheSkid = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 12), mats.copper);
+      pheSkid.position.set(8, 3, -8);
+      pheSkid.castShadow = true;
+      registerClickable(pheSkid, 'HEX-SKID-01');
+      group.add(pheSkid);
+
+      // Triple-Effect Falling Film Evaporator Towers
+      for (let e = 0; e < 3; e++) {
+        const evap = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 26, 20), mats.steel);
+        evap.position.set(10, 13, 6 + e * 7);
+        evap.castShadow = true;
+        registerClickable(evap, 'HEX-SKID-01');
+        group.add(evap);
+      }
+
+      hexFaultLight = new THREE.PointLight(0x06b6d4, 1.5, 30);
+      hexFaultLight.position.set(0, 12, 0);
+      group.add(hexFaultLight);
+
+      const hexPlume = new THREE.Mesh(
+        new THREE.CylinderGeometry(16, 20, 22, 24),
+        new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.2, depthWrite: false })
+      );
+      hexPlume.position.set(-10, 11, 35);
+      thermalPlumeGroup.add(hexPlume);
+
+      scene.add(group);
+    }
+
+    // ZONE 5: 45m SPRAY DRYING TOWER & AGGLOMERATION (42, -35)
+    function buildSprayDryerTower() {
+      const group = new THREE.Group();
+      group.position.set(42, 0, -35);
+
+      // Structural Steel Rig
+      const rig = new THREE.Mesh(
+        new THREE.BoxGeometry(24, 45, 24),
+        new THREE.MeshBasicMaterial({ color: 0x64748b, wireframe: true })
+      );
+      rig.position.set(0, 22.5, 0);
+      group.add(rig);
+
+      // Main Cylindrical Drying Chamber
+      const chamber = new THREE.Mesh(new THREE.CylinderGeometry(9.5, 9.5, 28, 32), mats.steel);
+      chamber.position.set(0, 29, 0);
+      chamber.castShadow = true;
+      registerClickable(chamber, 'DRYER-TOWER-01');
+      group.add(chamber);
+
+      // Conical Bottom
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(9.5, 13, 32), mats.steel);
+      cone.rotation.x = Math.PI;
+      cone.position.set(0, 8.5, 0);
+      registerClickable(cone, 'DRYER-TOWER-01');
+      group.add(cone);
+
+      // Fluid Bed Agglomerator at Base
+      const fluidBed = new THREE.Mesh(new THREE.BoxGeometry(14, 4, 8), mats.hulBlue);
+      fluidBed.position.set(0, 2, 14);
+      registerClickable(fluidBed, 'DRYER-TOWER-01');
+      group.add(fluidBed);
+
+      // Rising Steam Particles from Exhaust Stack
+      for (let p = 0; p < 18; p++) {
+        const puff = new THREE.Mesh(
+          new THREE.SphereGeometry(1.8 + Math.random() * 1.5, 8, 8),
+          new THREE.MeshBasicMaterial({ color: 0xe2e8f0, transparent: true, opacity: 0.25, depthWrite: false })
+        );
+        puff.position.set((Math.random() - 0.5) * 6, 44 + Math.random() * 18, (Math.random() - 0.5) * 6);
+        puff.userData = { baseX: 42, baseZ: -35, speed: 0.08 + Math.random() * 0.06 };
+        scene.add(puff);
+        steamParticles.push(puff);
+      }
+
+      scene.add(group);
+    }
+
+    // ZONE 6: HIGH-SPEED JAR PACKAGING LINES (42, 45)
+    function buildPackagingLines() {
+      const group = new THREE.Group();
+      group.position.set(42, 0, 45);
+
+      for (let line = 0; line < 3; line++) {
+        const z = (line - 1) * 14;
+        // Conveyor Bed
+        const conv = new THREE.Mesh(new THREE.BoxGeometry(36, 1.4, 2.4), mats.darkSteel);
+        conv.position.set(0, 1.2, z);
+        registerClickable(conv, 'PACK-LINE-01');
+        group.add(conv);
+
+        // Filler & Capper Monoblock
+        const filler = new THREE.Mesh(new THREE.BoxGeometry(7, 5.5, 4.5), mats.hulBlue);
+        filler.position.set(-8, 3.2, z);
+        filler.castShadow = true;
+        registerClickable(filler, 'PACK-LINE-01');
+        group.add(filler);
+
+        // Labeler & Vision QC Tunnel
+        const qc = new THREE.Mesh(new THREE.BoxGeometry(5, 4.5, 4), mats.bruGold);
+        qc.position.set(4, 2.8, z);
+        registerClickable(qc, 'PACK-LINE-01');
+        group.add(qc);
+
+        // Moving Glass Bru Coffee Jars on Conveyor
+        for (let j = 0; j < 10; j++) {
+          const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.9, 10), mats.bruGold);
+          jar.position.set(-16 + j * 3.4, 2.35, z);
+          group.add(jar);
+          jarInstances.push({ mesh: jar, minX: -16, maxX: 16 });
+        }
+      }
+
+      scene.add(group);
+    }
+
+    // ZONE 7: AUTOMATED HIGH-BAY WAREHOUSE & SUPPLY CHAIN DOCKS (105, 10)
+    function buildAutomatedWarehouse() {
+      const group = new THREE.Group();
+      group.position.set(105, 0, 10);
+
+      // Instanced High-Bay Racks (6 Aisles x 10 Bays x 5 Levels = 300 Rack Frames & Pallets)
+      const rackCount = 6 * 10 * 5;
+      const uprightGeo = new THREE.BoxGeometry(2.6, 0.35, 2.6);
+      const rackInst = new THREE.InstancedMesh(uprightGeo, mats.rackOrange, rackCount);
+      const palletGeo = new THREE.BoxGeometry(2.1, 1.8, 2.1);
+      const palletInst = new THREE.InstancedMesh(palletGeo, mats.carton, rackCount);
+      palletInst.castShadow = true;
+      registerClickable(palletInst, 'WAREHOUSE-ASRS');
+
+      const dummy = new THREE.Object3D();
+      let idx = 0;
+      for (let a = 0; a < 6; a++) {
+        for (let b = 0; b < 10; b++) {
+          for (let lvl = 0; lvl < 5; lvl++) {
+            const x = -20 + a * 8.5;
+            const z = -52 + b * 9.5;
+            const y = 2.2 + lvl * 4.2;
+
+            dummy.position.set(x, y - 1.1, z);
+            dummy.updateMatrix();
+            rackInst.setMatrixAt(idx, dummy.matrix);
+
+            dummy.position.set(x, y, z);
+            dummy.updateMatrix();
+            palletInst.setMatrixAt(idx, dummy.matrix);
+            idx++;
+          }
+        }
+      }
+      group.add(rackInst, palletInst);
+
+      // 4 Outbound Freight Trucks at Loading Docks
+      for (let t = 0; t < 4; t++) {
+        const tx = -18 + t * 12;
+        const trailer = new THREE.Mesh(new THREE.BoxGeometry(4.2, 5.2, 16), mats.hulBlue);
+        trailer.position.set(tx, 3.2, 68);
+        trailer.castShadow = true;
+        group.add(trailer);
+
+        const cab = new THREE.Mesh(new THREE.BoxGeometry(4, 4.2, 4.5), mats.steel);
+        cab.position.set(tx, 2.7, 79);
+        group.add(cab);
+      }
+
+      scene.add(group);
+    }
+
+    // ZONE 8: BIOMASS CHP POWERPLANT & ZLD WATER RECYCLING (-95, 45)
+    function buildPowerplantAndZld() {
+      const group = new THREE.Group();
+      group.position.set(-95, 0, 45);
+
+      // 2 Hyperbolic Cooling Towers
+      for (let c = 0; c < 2; c++) {
+        const towerGeo = new THREE.CylinderGeometry(5.5, 8.5, 26, 28, 1, false);
+        const tower = new THREE.Mesh(towerGeo, mats.darkSteel);
+        tower.position.set(-20 + c * 20, 13, -12);
+        tower.castShadow = true;
+        registerClickable(tower, 'POWERPLANT-CHP');
+        group.add(tower);
+
+        // Steam Plume
+        for (let p = 0; p < 8; p++) {
+          const puff = new THREE.Mesh(
+            new THREE.SphereGeometry(2.2, 8, 8),
+            new THREE.MeshBasicMaterial({ color: 0xf1f5f9, transparent: true, opacity: 0.22, depthWrite: false })
+          );
+          puff.position.set(-95 - 20 + c * 20, 27 + p * 2.2, 33);
+          puff.userData = { baseX: -95 - 20 + c * 20, baseZ: 33, speed: 0.07 + Math.random() * 0.05 };
+          scene.add(puff);
+          steamParticles.push(puff);
+        }
+      }
+
+      // Biomass Boiler & CHP Turbine Hall
+      const boiler = new THREE.Mesh(new THREE.BoxGeometry(22, 16, 16), mats.hulBlue);
+      boiler.position.set(16, 8, -12);
+      boiler.castShadow = true;
+      registerClickable(boiler, 'POWERPLANT-CHP');
+      group.add(boiler);
+
+      // Solar Panel Array on Boiler Roof
+      const solar = new THREE.Mesh(new THREE.BoxGeometry(20, 0.4, 14), mats.solarPanel);
+      solar.position.set(16, 16.4, -12);
+      group.add(solar);
+
+      // ZLD Clarifier & RO Water Recycling Circular Tanks
+      for (let w = 0; w < 2; w++) {
+        const tankWall = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, 4.5, 28), mats.steel);
+        tankWall.position.set(-14 + w * 22, 2.25, 16);
+        registerClickable(tankWall, 'POWERPLANT-CHP');
+        group.add(tankWall);
+
+        const waterSurface = new THREE.Mesh(new THREE.CylinderGeometry(7.6, 7.6, 4.7, 28), mats.waterCyan);
+        waterSurface.position.set(-14 + w * 22, 2.25, 16);
+        group.add(waterSurface);
+      }
+
+      scene.add(group);
+    }
+
+    buildSiloFarm();
+    buildRoastingZone();
+    buildExtractionBattery();
+    buildHeatExchangerNetwork();
+    buildSprayDryerTower();
+    buildPackagingLines();
+    buildAutomatedWarehouse();
+    buildPowerplantAndZld();
+
+    // ---------------------------------------------------------------------
+    // 5. AGV FLEET, NODE 4 INTERSECTION & ONE-WAY LOOP KAIZEN GRAPH
+    // ---------------------------------------------------------------------
+    const agvFleet = [];
+    let node4Beacon = null;
+    let routeLineMesh = null;
+
+    // Arterial Node 4 Position (Between Packaging & Warehouse at x: 72, z: 35)
+    const NODE4_POS = new THREE.Vector3(72, 0.2, 35);
+
+    function buildAgvRouteAndFleet() {
+      // Node 4 Ground Halo
+      const haloGeo = new THREE.RingGeometry(4.5, 6.2, 32);
+      const haloMat = new THREE.MeshBasicMaterial({ color: 0x10b981, side: THREE.DoubleSide, transparent: true, opacity: 0.75 });
+      node4Beacon = new THREE.Mesh(haloGeo, haloMat);
+      node4Beacon.rotation.x = -Math.PI / 2;
+      node4Beacon.position.copy(NODE4_POS);
+      routeGraphGroup.add(node4Beacon);
+
+      // Create 5S Blocked Aisle Clutter Pallets near Node 4 (Hidden unless Bi-Dir Surge is active)
+      for (let c = 0; c < 6; c++) {
+        const clutter = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.8, 2.2), mats.roasterGlow);
+        clutter.position.set(68 + (c % 3) * 4, 0.9, 28 + Math.floor(c / 3) * 14);
+        clutter.visible = false;
+        scene.add(clutter);
+        blockedClutterMeshes.push(clutter);
+      }
+
+      // Build 8 Autonomous Guided Vehicles (AGVs)
+      for (let i = 0; i < 8; i++) {
+        const agvGroup = new THREE.Group();
+        const chassis = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.1, 2.2), mats.hulBlue);
+        chassis.position.y = 0.6;
+        chassis.castShadow = true;
+        agvGroup.add(chassis);
+
+        const payload = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.6, 1.8), mats.carton);
+        payload.position.y = 1.95;
+        agvGroup.add(payload);
+
+        const beaconMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+        const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.45, 12, 12), beaconMat);
+        beacon.position.y = 3.1;
+        agvGroup.add(beacon);
+
+        scene.add(agvGroup);
+        agvFleet.push({
+          group: agvGroup,
+          beaconMat: beaconMat,
+          progress: i / 8,
+          dir: i % 2 === 0 ? 1 : -1
+        });
+      }
+
+      updateRouteGraphGeometry();
+    }
+
+    function updateRouteGraphGeometry() {
+      if (routeLineMesh) routeGraphGroup.remove(routeLineMesh);
+
+      const points = [];
+      if (simState.oneWayLoop) {
+        // One-Way Closed Loop (Packaging -> North Aisle -> Warehouse -> South Return -> Packaging)
+        points.push(
+          new THREE.Vector3(58, 0.3, 52),
+          new THREE.Vector3(72, 0.3, 52),
+          new THREE.Vector3(92, 0.3, 52),
+          new THREE.Vector3(92, 0.3, 18),
+          new THREE.Vector3(72, 0.3, 18),
+          new THREE.Vector3(58, 0.3, 18),
+          new THREE.Vector3(58, 0.3, 52)
+        );
+      } else {
+        // Bi-Directional Single Arterial Spine through Node 4 (72, 35)
+        points.push(
+          new THREE.Vector3(55, 0.3, 35),
+          new THREE.Vector3(72, 0.3, 35),
+          new THREE.Vector3(92, 0.3, 35)
+        );
+      }
+
+      const geo = new THREE.BufferGeometry().setFromPoints(points);
+      const mat = new THREE.LineBasicMaterial({
+        color: simState.oneWayLoop ? 0x10b981 : (simState.scenario === 'surge_bidir' ? 0xef4444 : 0x38bdf8),
+        linewidth: 3
+      });
+      routeLineMesh = new THREE.Line(geo, mat);
+      routeGraphGroup.add(routeLineMesh);
+    }
+
+    buildAgvRouteAndFleet();
+
+    // ---------------------------------------------------------------------
+    // 6. SCENARIO LAB CONTROLLER & KPI UPDATER
+    // ---------------------------------------------------------------------
+    function setScenario(mode) {
+      simState.scenario = mode;
+      simState.oneWayLoop = (mode === 'surge_oneway');
+
+      // Update Scenario Lab Button Styles
+      const btnBase = document.getElementById('btn-scen-baseline');
+      const btnSurge = document.getElementById('btn-scen-surge');
+      const btnKaizen = document.getElementById('btn-scen-kaizen');
+      const activeCls = 'w-full text-left p-2 rounded-lg border transition flex items-center justify-between bg-blue-600/25 border-blue-400 text-white shadow';
+      const idleCls = 'w-full text-left p-2 rounded-lg border transition flex items-center justify-between bg-slate-900/70 border-slate-700/80 text-slate-300 hover:bg-slate-800/80';
+
+      btnBase.className = mode === 'baseline' ? activeCls : idleCls;
+      btnSurge.className = mode === 'surge_bidir' ? activeCls : idleCls;
+      btnKaizen.className = mode === 'surge_oneway' ? activeCls : idleCls;
+
+      // Update One-Way Toggle Pill
+      const toggleBtn = document.getElementById('toggle-oneway-btn');
+      if (simState.oneWayLoop) {
+        toggleBtn.textContent = 'ACTIVE (ONE-WAY LOOP)';
+        toggleBtn.className = 'px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 transition';
+      } else {
+        toggleBtn.textContent = 'OFF (BI-DIR)';
+        toggleBtn.className = 'px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700 transition';
+      }
+
+      // Compute deterministic KPIs from Master Specification
+      if (mode === 'baseline') {
+        simState.kpis = {
+          oee: 78.4, throughput: 14200, target: 14200,
+          agvWait: 4.2, agvUtil: 68, carbon: 1.14, waterZld: 94.8,
+          score5s: 96.5, violations5s: 0
+        };
+        node4Beacon.material.color.setHex(0x10b981);
+        blockedClutterMeshes.forEach(m => m.visible = false);
+      } else if (mode === 'surge_bidir') {
+        simState.kpis = {
+          oee: 81.2, throughput: 18250, target: 19880,
+          agvWait: 38.6, agvUtil: 97, carbon: 1.19, waterZld: 94.2,
+          score5s: 74.0, violations5s: 43
+        };
+        node4Beacon.material.color.setHex(0xef4444);
+        blockedClutterMeshes.forEach(m => m.visible = true);
+      } else if (mode === 'surge_oneway') {
+        simState.kpis = {
+          oee: 86.7, throughput: 19910, target: 19880,
+          agvWait: 2.3, agvUtil: 82, carbon: 1.10, waterZld: 95.4,
+          score5s: 98.2, violations5s: 0
+        };
+        node4Beacon.material.color.setHex(0x10b981);
+        blockedClutterMeshes.forEach(m => m.visible = false);
+      }
+
+      updateRouteGraphGeometry();
+      refreshHudKpis();
+    }
+
+    function toggleOneWayKaizen() {
+      if (simState.scenario === 'surge_bidir') {
+        setScenario('surge_oneway');
+      } else if (simState.scenario === 'surge_oneway') {
+        setScenario('surge_bidir');
+      } else {
+        setScenario('surge_oneway');
+      }
+    }
+
+    function refreshHudKpis() {
+      const k = simState.kpis;
+      document.getElementById('kpi-oee').textContent = k.oee.toFixed(1) + '%';
+      document.getElementById('kpi-throughput').textContent = k.throughput.toLocaleString();
+      document.getElementById('kpi-throughput-target').textContent = `/ ${k.target.toLocaleString()} tgt`;
+
+      const waitEl = document.getElementById('kpi-agv-wait');
+      waitEl.textContent = k.agvWait.toFixed(1) + 's';
+      waitEl.className = k.agvWait > 15
+        ? 'text-base font-extrabold text-rose-400 animate-pulse'
+        : 'text-base font-extrabold text-emerald-400';
+      document.getElementById('kpi-agv-util').textContent = `(${k.agvUtil}% util)`;
+
+      document.getElementById('kpi-carbon').innerHTML = `${k.carbon.toFixed(2)} <span class="text-[9px] font-normal">kgCO₂e/kg</span>`;
+      document.getElementById('kpi-water').innerHTML = `${k.waterZld.toFixed(1)}% <span class="text-[9px] font-normal">ZLD</span>`;
+      document.getElementById('esg-carbon-detail').textContent = `${k.carbon.toFixed(2)} kgCO₂e/kg (${simState.oneWayLoop ? '-3.2% Kaizen' : 'Nominal'})`;
+
+      const s5El = document.getElementById('kpi-5s-score');
+      const incEl = document.getElementById('kpi-5s-incidents');
+      s5El.textContent = k.score5s.toFixed(1) + '%';
+
+      if (k.violations5s > 0) {
+        s5El.className = 'text-sm font-bold text-rose-400';
+        incEl.textContent = `${k.violations5s} Aisle Blocked!`;
+        incEl.className = 'text-[9px] px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-500/60 animate-pulse';
+        document.getElementById('s5-set').textContent = '62%';
+        document.getElementById('s5-set').className = 'text-rose-400 font-bold text-xs';
+        document.getElementById('cctv-4-badge').textContent = '⚠ NODE4 DEADLOCK';
+        document.getElementById('cctv-4-badge').className = 'text-rose-400 font-bold';
+      } else {
+        s5El.className = 'text-sm font-bold text-emerald-400';
+        incEl.textContent = '0 Violations';
+        incEl.className = 'text-[9px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700/50';
+        document.getElementById('s5-set').textContent = '98%';
+        document.getElementById('s5-set').className = 'text-emerald-400 font-bold text-xs';
+        document.getElementById('cctv-4-badge').textContent = simState.oneWayLoop ? '● 1-WAY LOOP OK' : '● FLOW CLEAR';
+        document.getElementById('cctv-4-badge').className = 'text-emerald-400';
+      }
+
+      // Sync Warehouse Telemetry Card
+      assetDatabase['WAREHOUSE-ASRS'].m2Val = k.agvWait.toFixed(1) + ' sec';
+      if (simState.selectedAsset === 'WAREHOUSE-ASRS') {
+        document.getElementById('tel-metric2-val').textContent = assetDatabase['WAREHOUSE-ASRS'].m2Val;
+      }
+    }
+
+    // Physical Equipment Fault Injectors
+    function injectFault(type) {
+      simState.faults[type] = !simState.faults[type];
+      const active = simState.faults[type];
+
+      if (type === 'roaster') {
+        roasterFaultLight.color.setHex(active ? 0xff0000 : 0xffaa00);
+        roasterFaultLight.intensity = active ? 3.5 : 1.5;
+        assetDatabase['ROASTER-01'].m1Val = active ? '234.8 °C (HIGH)' : '214.5 °C';
+        assetDatabase['ROASTER-01'].status = active ? 'THERMAL ALERT' : 'RUNNING';
+        inspectAsset('ROASTER-01');
+        flyToZone('roasting');
+      } else if (type === 'hex') {
+        hexFaultLight.color.setHex(active ? 0xef4444 : 0x06b6d4);
+        assetDatabase['HEX-SKID-01'].m2Val = active ? '1.38 bar (FOULED)' : '0.42 bar';
+        assetDatabase['HEX-SKID-01'].status = active ? 'CIP REQUIRED' : 'RUNNING';
+        document.getElementById('cctv-2-badge').textContent = active ? '⚠ ΔP FOULING' : '● 88.5°C';
+        inspectAsset('HEX-SKID-01');
+        flyToZone('hex');
+      } else if (type === 'pack') {
+        assetDatabase['PACK-LINE-01'].m1Val = active ? '0 jars/m (JAM)' : '240 jars/m';
+        assetDatabase['PACK-LINE-01'].status = active ? 'BELT JAMMED' : 'RUNNING';
+        document.getElementById('cctv-3-badge').textContent = active ? '⚠ ACCUM JAM' : '● HAIRNET 100%';
+        inspectAsset('PACK-LINE-01');
+        flyToZone('packaging');
+      }
+    }
+
+    function clearFaults() {
+      simState.faults = { roaster: false, hex: false, pack: false };
+      roasterFaultLight.color.setHex(0xffaa00);
+      hexFaultLight.color.setHex(0x06b6d4);
+      assetDatabase['ROASTER-01'].m1Val = '214.5 °C';
+      assetDatabase['ROASTER-01'].status = 'RUNNING';
+      assetDatabase['HEX-SKID-01'].m2Val = '0.42 bar';
+      assetDatabase['HEX-SKID-01'].status = 'RUNNING';
+      assetDatabase['PACK-LINE-01'].m1Val = '240 jars/m';
+      assetDatabase['PACK-LINE-01'].status = 'RUNNING';
+      document.getElementById('cctv-2-badge').textContent = '● 88.5°C';
+      document.getElementById('cctv-3-badge').textContent = '● HAIRNET 100%';
+      setScenario('baseline');
+    }
+
+    // ---------------------------------------------------------------------
+    // 7. CINEMATIC NAVIGATION (HELI ORBIT, WALKTHROUGH, ZONE TELEPORT)
+    // ---------------------------------------------------------------------
+    const zoneBookmarks = {
+      overview:   { pos: { x: 0, y: 145, z: 185 }, target: { x: 0, y: 0, z: 0 }, asset: null },
+      silos:      { pos: { x: -115, y: 45, z: 20 }, target: { x: -115, y: 18, z: -45 }, asset: 'SILO-FARM-01' },
+      roasting:   { pos: { x: -60, y: 28, z: 5 }, target: { x: -60, y: 8, z: -45 }, asset: 'ROASTER-01' },
+      extraction: { pos: { x: -10, y: 32, z: 5 }, target: { x: -10, y: 12, z: -45 }, asset: 'EXTRACTOR-01' },
+      hex:        { pos: { x: -10, y: 26, z: 82 }, target: { x: -10, y: 8, z: 35 }, asset: 'HEX-SKID-01' },
+      dryer:      { pos: { x: 42, y: 52, z: 25 }, target: { x: 42, y: 24, z: -35 }, asset: 'DRYER-TOWER-01' },
+      packaging:  { pos: { x: 42, y: 22, z: 88 }, target: { x: 42, y: 4, z: 45 }, asset: 'PACK-LINE-01' },
+      warehouse:  { pos: { x: 75, y: 38, z: 95 }, target: { x: 90, y: 8, z: 30 }, asset: 'WAREHOUSE-ASRS' },
+      powerplant: { pos: { x: -95, y: 38, z: 105 }, target: { x: -95, y: 10, z: 45 }, asset: 'POWERPLANT-CHP' }
+    };
+
+    function flyToZone(key) {
+      const bm = zoneBookmarks[key];
+      if (!bm) return;
+      simState.cameraMode = (key === 'overview') ? 'heli' : 'free';
+      updateCameraModeButtons();
+
+      new TWEEN.Tween(camera.position)
+        .to(bm.pos, 1400)
+        .easing(TWEEN.Easing.Cubic.InOut)
+        .start();
+
+      new TWEEN.Tween(controls.target)
+        .to(bm.target, 1400)
+        .easing(TWEEN.Easing.Cubic.InOut)
+        .start();
+
+      if (bm.asset) inspectAsset(bm.asset);
+    }
+
+    function setCameraMode(mode) {
+      simState.cameraMode = mode;
+      updateCameraModeButtons();
+      if (mode === 'heli') {
+        flyToZone('overview');
+        simState.cameraMode = 'heli';
+      } else if (mode === 'walk') {
+        new TWEEN.Tween(camera.position).to({ x: -90, y: 3.2, z: 0 }, 1200).start();
+        new TWEEN.Tween(controls.target).to({ x: 90, y: 3.0, z: 0 }, 1200).start();
+      }
+    }
+
+    function updateCameraModeButtons() {
+      const m = simState.cameraMode;
+      document.getElementById('active-cam-label').textContent = m.toUpperCase();
+      const active = 'p-2 rounded-lg bg-cyan-500/20 border border-cyan-500/50 text-cyan-200 flex flex-col items-center gap-1 transition';
+      const idle = 'p-2 rounded-lg bg-slate-900/80 border border-slate-700 text-slate-300 hover:bg-slate-800 flex flex-col items-center gap-1 transition';
+      document.getElementById('cam-btn-heli').className = m === 'heli' ? active : idle;
+      document.getElementById('cam-btn-walk').className = m === 'walk' ? active : idle;
+      document.getElementById('cam-btn-free').className = m === 'free' ? active : idle;
+    }
+
+    function toggleLayer(layerName) {
+      simState.layers[layerName] = !simState.layers[layerName];
+      const on = simState.layers[layerName];
+      if (layerName === 'routes') routeGraphGroup.visible = on;
+      if (layerName === 'zones5s') zones5sGroup.visible = on;
+      if (layerName === 'thermal') thermalPlumeGroup.visible = on;
+      if (layerName === 'shell') shellGroup.visible = on;
+
+      const btnId = { routes: 'layer-routes', zones5s: 'layer-5s', thermal: 'layer-thermal', shell: 'layer-shell' }[layerName];
+      const btn = document.getElementById(btnId);
+      btn.className = on
+        ? 'px-2 py-1.5 rounded bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 flex items-center justify-between'
+        : 'px-2 py-1.5 rounded bg-slate-900 border border-slate-700 text-slate-400 flex items-center justify-between';
+    }
+
+    // Set initial camera view
+    camera.position.set(0, 145, 185);
+    controls.target.set(0, 0, 0);
+    controls.update();
+
+    // ---------------------------------------------------------------------
+    // 8. DEEP EQUIPMENT TELEMETRY DRAWER & CHART.JS
+    // ---------------------------------------------------------------------
+    let telemetryChart = null;
+
+    function initTelemetryChart() {
+      const ctx = document.getElementById('telemetry-chart').getContext('2d');
+      telemetryChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ['-7m', '-6m', '-5m', '-4m', '-3m', '-2m', '-1m', 'NOW'],
+          datasets: [{
+            label: 'Sensor Stream',
+            data: [88.1, 88.3, 88.5, 88.4, 88.6, 88.5, 88.4, 88.5],
+            borderColor: '#06b6d4',
+            backgroundColor: 'rgba(6, 182, 212, 0.15)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.35,
+            pointRadius: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#64748b', font: { size: 9 } }, grid: { display: false } },
+            y: { ticks: { color: '#64748b', font: { size: 9 } }, grid: { color: 'rgba(51,65,85,0.3)' } }
+          }
+        }
+      });
+    }
+    initTelemetryChart();
+
+    function inspectAsset(assetId) {
+      const data = assetDatabase[assetId];
+      if (!data) return;
+      simState.selectedAsset = assetId;
+      document.getElementById('telemetry-drawer').classList.remove('hidden');
+
+      document.getElementById('tel-asset-id').textContent = assetId;
+      document.getElementById('tel-asset-name').textContent = data.name;
+      const statusEl = document.getElementById('tel-asset-status');
+      statusEl.textContent = data.status;
+      statusEl.className = data.status === 'RUNNING'
+        ? 'text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+        : 'text-[9px] font-mono px-1.5 py-0.5 rounded bg-rose-500/30 text-rose-300 border border-rose-500/50 animate-pulse';
+
+      document.getElementById('tel-metric1-label').textContent = data.m1Label;
+      document.getElementById('tel-metric1-val').textContent = data.m1Val;
+      document.getElementById('tel-metric2-label').textContent = data.m2Label;
+      document.getElementById('tel-metric2-val').textContent = data.m2Val;
+      document.getElementById('tel-metric3-label').textContent = data.m3Label;
+      document.getElementById('tel-metric3-val').textContent = data.m3Val;
+
+      document.getElementById('tel-mtbf').textContent = data.mtbf;
+      document.getElementById('tel-power').textContent = data.power;
+      document.getElementById('tel-anomaly').textContent = data.anomaly;
+
+      if (telemetryChart) {
+        telemetryChart.data.datasets[0].data = [...data.series];
+        telemetryChart.update();
+      }
+    }
+
+    function closeTelemetryDrawer() {
+      document.getElementById('telemetry-drawer').classList.add('hidden');
+    }
+
+    function dispatchWorkOrder() {
+      const id = simState.selectedAsset;
+      appendCopilotMessage('ai', `[tool: create_work_order] Queued DRAFT PM work order <strong>#WO-DRAFT-${String(++woSeq).padStart(4,"0")}</strong> for asset <strong>${id}</strong>. SAP PM connector not attached: nothing has been posted.`);
+    }
+
+    // 3D Click Raycaster for Equipment Inspection
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let mouseDownPos = { x: 0, y: 0 };
+
+    renderer.domElement.addEventListener('pointerdown', e => {
+      mouseDownPos = { x: e.clientX, y: e.clientY };
+    });
+
+    renderer.domElement.addEventListener('pointerup', e => {
+      const dist = Math.hypot(e.clientX - mouseDownPos.x, e.clientY - mouseDownPos.y);
+      if (dist > 6) return; // Ignore drag orbit
+
+      pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+      const hits = raycaster.intersectObjects(clickableMeshes, false);
+      if (hits.length > 0 && hits[0].object.userData.assetId) {
+        inspectAsset(hits[0].object.userData.assetId);
+      }
+    });
+
+    // ---------------------------------------------------------------------
+    // 9. SIMULATED VIRTUAL CCTV & LIVE YOLO BOUNDING BOX RENDERER
+    // ---------------------------------------------------------------------
+    const cctvCanvases = [
+      { id: 'cctv-cam-1', zone: 'ROASTING', color: '#f59e0b' },
+      { id: 'cctv-cam-2', zone: 'HEX-SKID', color: '#06b6d4' },
+      { id: 'cctv-cam-3', zone: 'PACKAGING', color: '#6366f1' },
+      { id: 'cctv-cam-4', zone: 'WH-NODE4', color: '#10b981' }
+    ];
+
+    function renderCctvFeeds(time) {
+      cctvCanvases.forEach((cam, idx) => {
+        const canvas = document.getElementById(cam.id);
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width, h = canvas.height;
+
+        // Dark CCTV Background
+        ctx.fillStyle = '#070d19';
+        ctx.fillRect(0, 0, w, h);
+
+        // Perspective Grid Lines
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.14)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < w; x += 28) {
+          ctx.beginPath(); ctx.moveTo(x, 25); ctx.lineTo(x, h); ctx.stroke();
+        }
+
+        // Dynamic YOLO Bounding Boxes per Camera
+        const shift = Math.sin(time * 1.8 + idx) * 18;
+
+        if (idx === 0) {
+          // Roaster Feed: Worker PPE Helmet + Drum Thermal Box
+          drawYoloBox(ctx, 25 + shift, 38, 42, 62, '#10b981', 'person 0.96 | helmet');
+          const rColor = simState.faults.roaster ? '#ef4444' : '#f59e0b';
+          drawYoloBox(ctx, 115, 28, 85, 65, rColor, simState.faults.roaster ? 'THERMAL 235C' : 'roaster_drum 0.98');
+        } else if (idx === 1) {
+          // Heat Exchanger IR Feed
+          const hColor = simState.faults.hex ? '#ef4444' : '#06b6d4';
+          drawYoloBox(ctx, 30, 32, 155, 68, hColor, simState.faults.hex ? 'HEX_FOULING dP:1.38b' : 'hex_manifold 88.5C');
+        } else if (idx === 2) {
+          // Packaging Line Feed: Hairnet PPE + Carton Flow
+          drawYoloBox(ctx, 22, 34, 44, 68, '#10b981', 'head_hairnet 0.99');
+          const pColor = simState.faults.pack ? '#ef4444' : '#38bdf8';
+          drawYoloBox(ctx, 95 + shift * 0.6, 48, 95, 45, pColor, simState.faults.pack ? 'belt_jam 0.94' : 'bru_jar_flow 240/m');
+        } else if (idx === 3) {
+          // Warehouse Arterial Node 4 Feed
+          if (simState.scenario === 'surge_bidir') {
+            drawYoloBox(ctx, 18, 36, 75, 58, '#ef4444', 'agv_deadlock 38.6s');
+            drawYoloBox(ctx, 105, 44, 98, 56, '#f59e0b', 'aisle_blocked (43)');
+          } else {
+            drawYoloBox(ctx, 55 + shift * 1.3, 38, 68, 54, '#10b981', simState.oneWayLoop ? 'agv_1way_loop 2.3s' : 'agv_clear 4.2s');
+          }
+        }
+
+        // Timestamp Overlay
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.8)';
+        ctx.font = '9px JetBrains Mono';
+        const nowStr = new Date().toTimeString().split(' ')[0];
+        ctx.fillText(`REC ${nowStr} | SEED:0x8F3A`, 6, h - 5);
+      });
+    }
+
+    function drawYoloBox(ctx, x, y, w, h, color, label) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x, y, w, h);
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y - 11, Math.min(w + 25, 115), 11);
+      ctx.fillStyle = '#020617';
+      ctx.font = 'bold 8px JetBrains Mono';
+      ctx.fillText(label, x + 3, y - 3);
+    }
+
+    function toggleCctvWall() {
+      const grid = document.getElementById('cctv-grid-container');
+      grid.classList.toggle('hidden');
+    }
+
+    // ---------------------------------------------------------------------
+    // 10. GROUNDED HUL INDUSTRIAL AI COPILOT
+    // ---------------------------------------------------------------------
+    function appendCopilotMessage(role, htmlText) {
+      const box = document.getElementById('copilot-messages');
+      const div = document.createElement('div');
+      if (role === 'user') {
+        div.className = 'bg-blue-600/25 border border-blue-500/40 rounded-lg p-2 text-blue-100 ml-6 text-right';
+        div.textContent = htmlText;
+      } else {
+        div.className = 'bg-slate-900/95 border border-slate-700/90 rounded-lg p-2.5 text-slate-200 leading-relaxed';
+        div.innerHTML = htmlText;
+      }
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+      lucide.createIcons();
+    }
+
+    function askCopilot(topic) {
+      if (topic === 'surge') {
+        appendCopilotMessage('user', 'Simulate +40% Customer Demand Surge and diagnose bottlenecks.');
+        setScenario('surge_bidir');
+        flyToZone('warehouse');
+        setTimeout(() => {
+          appendCopilotMessage('ai', `
+            <div class="text-[9px] font-mono text-amber-400 mb-1">[tool: run_scenario_lab(surge="+40%", routing="bi_directional", seed="0x8F3A")]</div>
+            <strong>Bottleneck Identified at Warehouse Node 4:</strong><br>
+            • This model covers the packaging → Node 4 → ASRS flow only; process-core thermal limits are not simulated.<br>
+            • However, plant throughput reached <strong>${F(R.surge_bidir.thr)} Jars/hr</strong> (target ${F(R.surge_bidir.target)}; ${F(R.surge_bidir.lost)} jars lost to a full dock over 72h).<br>
+            • <strong>Root Cause:</strong> Direction-switch queueing at Node 4 pushed mean wait to <strong>${F(R.surge_bidir.wait,1)}s</strong> (p95 ${F(R.surge_bidir.p95,1)}s, fleet ${F(R.surge_bidir.util)}% utilised) and triggered <strong>${F(R.surge_bidir.eps)} <code>aisle_blocked</code> 5S incidents</strong> on CAM-WH-NODE4.<br>
+            • <em>Recommendation:</em> Click <strong>Apply One-Way Kaizen</strong> to convert the route graph into a unidirectional loop.
+          `);
+        }, 350);
+      } else if (topic === 'kaizen') {
+        appendCopilotMessage('user', 'Apply the One-Way AGV Route Graph Kaizen and verify OEE & 5S compliance.');
+        setScenario('surge_oneway');
+        flyToZone('warehouse');
+        setTimeout(() => {
+          appendCopilotMessage('ai', `
+            <div class="text-[9px] font-mono text-emerald-400 mb-1">[tool: apply_route_kaizen(mode="one_way_loop")] • [tool: get_kpis]</div>
+            <strong>Zero-Capex One-Way Loop Kaizen Verified:</strong><br>
+            • <strong>Plant OEE:</strong> Moved from ${F(R.surge_bidir.oee,1)}% → <strong>${F(R.surge_oneway.oee,1)}%</strong>.<br>
+            • <strong>Throughput:</strong> Reached <strong>${F(R.surge_oneway.thr)} Jars/hr</strong> (target ${F(R.surge_oneway.target)}).<br>
+            • <strong>AGV Wait Time:</strong> Dropped from ${F(R.surge_bidir.wait,1)}s → <strong>${F(R.surge_oneway.wait,1)}s</strong> (fleet ${F(R.surge_oneway.util)}% utilised).<br>
+            • <strong>Lean 5S & ESG:</strong> <strong>${F(R.surge_oneway.eps)}</strong> <code>aisle_blocked</code> episodes; carbon and 5S scores are reference values, not simulated (attribution to be verified).
+          `);
+        }, 350);
+      } else if (topic === 'hex') {
+        appendCopilotMessage('user', 'Audit Heat Exchanger fouling and Biomass CHP Powerplant steam load.');
+        flyToZone('hex');
+        inspectAsset('HEX-SKID-01');
+        setTimeout(() => {
+          appendCopilotMessage('ai', `
+            <div class="text-[9px] font-mono text-cyan-400 mb-1">[tool: inspect_heat_exchanger(id="HEX-SKID-01")] • [tool: get_sensor_trend]</div>
+            <strong>Thermal & Utility Audit (Zones 4 & 8):</strong><br>
+            • <strong>Shell & Tube + PHE Skid:</strong> Outlet temp stable at <strong>88.5°C</strong>, Differential Pressure ΔP at <strong>0.42 bar</strong> (91.2% heat recovery efficiency).<br>
+            • <strong>3-Effect Falling Film Evaporator:</strong> Concentrating coffee extract to 48°Bx ahead of the 45m Spray Dryer.<br>
+            • <strong>Biomass CHP Powerplant:</strong> Generating <strong>14.2 MW</strong> and <strong>28.5 t/hr steam</strong> utilizing spent coffee grounds biofuel.
+          `);
+        }, 350);
+      } else if (topic === 'esg') {
+        appendCopilotMessage('user', 'Generate ESG Carbon, ZLD Water Circularity, and Lean 5S compliance summary.');
+        flyToZone('powerplant');
+        setTimeout(() => {
+          const k = simState.kpis;
+          appendCopilotMessage('ai', `
+            <div class="text-[9px] font-mono text-purple-400 mb-1">[tool: query_esg_metrics] • [tool: audit_5s_vision]</div>
+            <strong>Executive ESG & Lean 5S Readout:</strong><br>
+            • <strong>Carbon Intensity:</strong> <strong>${k.carbon.toFixed(2)} kgCO₂e/kg</strong> (Scope 1+2 basis to be validated).<br>
+            • <strong>Water Circularity (ZLD):</strong> <strong>${k.waterZld.toFixed(1)}%</strong> closed-loop recovery via RO & MVR evaporator condensate recycling.<br>
+            • <strong>5S Vision Audit:</strong> Overall score <strong>${k.score5s.toFixed(1)}%</strong> (${k.violations5s} active aisle violations; PPE status from simulated CV, not a validated detection).
+          `);
+        }, 350);
+      }
+    }
+
+    function handleCopilotSubmit(e) {
+      e.preventDefault();
+      const input = document.getElementById('copilot-input');
+      const q = input.value.trim();
+      if (!q) return;
+      input.value = '';
+      appendCopilotMessage('user', q);
+
+      const lower = q.toLowerCase();
+      setTimeout(() => {
+        if (lower.includes('one-way') || lower.includes('kaizen') || lower.includes('loop')) {
+          askCopilot('kaizen');
+        } else if (lower.includes('surge') || lower.includes('40%') || lower.includes('bottleneck') || lower.includes('demand')) {
+          askCopilot('surge');
+        } else if (lower.includes('hex') || lower.includes('heat') || lower.includes('power') || lower.includes('boiler')) {
+          askCopilot('hex');
+        } else if (lower.includes('esg') || lower.includes('water') || lower.includes('carbon') || lower.includes('5s')) {
+          askCopilot('esg');
+        } else {
+          const k = simState.kpis;
+          appendCopilotMessage('ai', `
+            <div class="text-[9px] font-mono text-cyan-400 mb-1">[tool: get_kpis(seed="0x8F3A")]</div>
+            Current Plant Status (${simState.scenario.toUpperCase()}): OEE is <strong>${k.oee}%</strong>, Throughput is <strong>${k.throughput.toLocaleString()} Jars/hr</strong>, AGV Node 4 wait time is <strong>${k.agvWait}s</strong>, and ZLD Water Recycling is at <strong>${k.waterZld}%</strong>. Select any 3D asset or use the Scenario Lab to run a what-if simulation.
+          `);
+        }
+      }, 300);
+    }
+
+    // Comparison Matrix Modal Controls
+    function openComparisonModal() {
+      const m = document.getElementById('comparison-modal');
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+    }
+    function closeComparisonModal() {
+      const m = document.getElementById('comparison-modal');
+      m.classList.add('hidden');
+      m.classList.remove('flex');
+    }
+
+    // ---------------------------------------------------------------------
+    // 11. MASTER ANIMATION & DETERMINISTIC KINEMATICS LOOP
+    // ---------------------------------------------------------------------
+    const clock = new THREE.Clock();
+    let lastCctvRender = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      TWEEN.update();
+
+      const elapsed = clock.getElapsedTime();
+      const dt = Math.min(0.1, elapsed - (window._le || elapsed)); window._le = elapsed;
+
+      // 1. Camera Mode Automation (Helicopter Orbit / Floor Walkthrough)
+      if (simState.cameraMode === 'heli') {
+        camera.position.x = Math.sin(elapsed * 0.09) * 185;
+        camera.position.z = Math.cos(elapsed * 0.09) * 185;
+        camera.lookAt(0, 5, 0);
+      } else if (simState.cameraMode === 'walk') {
+        camera.position.x = -85 + ((elapsed * 9) % 170);
+        camera.position.y = 3.2 + Math.sin(elapsed * 5) * 0.08;
+        camera.position.z = 0;
+        controls.target.set(camera.position.x + 18, 3.0, 0);
+      }
+
+      // 2. Rotate Industrial Roaster Drums
+      roasterDrums.forEach(drum => {
+        drum.rotation.x = elapsed * 1.4;
+      });
+
+      // 3. Animate Rising Steam Particles from Spray Dryer & Cooling Towers
+      steamParticles.forEach(p => {
+        p.position.y += p.userData.speed * dt * 60;
+        p.position.x = p.userData.baseX + Math.sin(elapsed * 1.5 + p.position.y * 0.2) * 1.8;
+        if (p.position.y > 66) p.position.y = 30;
+      });
+
+      // 4. Move Bru Coffee Jars along Packaging Conveyors
+      if (!simState.faults.pack) {
+        jarInstances.forEach(j => {
+          j.mesh.position.x += 0.14 * dt * 60;
+          if (j.mesh.position.x > j.maxX) j.mesh.position.x = j.minX;
+        });
+      }
+
+      agvReplay(elapsed);
+
+      // 6. Pulse Node 4 Ground Halo
+      const s = 1 + Math.sin(elapsed * 4) * 0.08;
+      node4Beacon.scale.set(s, s, 1);
+
+      // 7. Render Virtual CCTV Feeds at ~10 FPS
+      if (elapsed - lastCctvRender > 0.1) {
+        renderCctvFeeds(elapsed);
+        lastCctvRender = elapsed;
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    let woSeq = 0;
+    const QG = [
+      ['Roast drop temp','°C','212-218',()=>simState.faults.roaster?234.8:214.5,v=>v>=212&&v<=218],
+      ['Development time ratio','%','18-22',()=>simState.faults.roaster?27.5:20.1,v=>v>=18&&v<=22],
+      ['Agtron colour','','55-62',()=>simState.faults.roaster?44:58,v=>v>=55&&v<=62],
+      ['Extract soluble yield','%','46-50',()=>simState.faults.hex?42.3:48.2,v=>v>=46&&v<=50],
+      ['Powder moisture','%','<=3.0',()=>simState.faults.hex?3.4:2.6,v=>v<=3.0],
+      ['Jar seal / vacuum pass','%','>=99.5',()=>simState.faults.pack?97.1:99.7,v=>v>=99.5],
+      ['Cupping score (QC panel)','pts','>=80',()=>simState.faults.roaster?76:82.5,v=>v>=80]
+    ];
+    function updateQuality() {
+      let fails = 0;
+      document.getElementById('q-rows').innerHTML = QG.map(([n,u,lim,get,ok])=>{
+        const v = get(), good = ok(v); if (!good) fails++;
+        return `<div class="flex justify-between"><span class="text-slate-400">${n}</span><span class="${good?'text-emerald-400':'text-rose-400 font-bold'}">${v} ${u} <span class="text-slate-600">[${lim}]</span></span></div>`;
+      }).join('');
+      document.getElementById('q-batch').innerHTML = fails
+        ? `<div class="text-[10px] font-mono font-bold text-rose-300 bg-rose-950/70 border border-rose-500/50 rounded px-2 py-1 animate-pulse">LOT-BRU-261116-R01 · HOLD · ${fails} gate(s) failed</div>`
+        : `<div class="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950/70 border border-emerald-700/50 rounded px-2 py-1">LOT-BRU-261116-R01 · RELEASE · all gates pass</div>`;
+    }
+    ['injectFault','clearFaults','setScenario'].forEach(n => { const f = window[n]; window[n] = function(){ const r = f.apply(this, arguments); updateQuality(); if(window.syncAlarms) syncAlarms(); return r; }; });
+    updateQuality();
+
+    const SIM={HOURS:72,IDEAL:22000,JPC:48,PASS:1.2,SWITCH:6,BUF:60,BLOCKQ:8,MTBF:180,MTTR:20,FLEET:16,Q:0.98};
+    function rng(s){let a=s>>>0;return()=>{a=(a+0x6D2B79F5)>>>0;let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};}
+    function runDES(demand,oneWay,seed,log){
+      const r=rng(seed),ex=m=>-m*Math.log(1-r()),H=SIM.HOURS*3600,lam=demand/SIM.JPC/3600,down=[];let dt=0;
+      for(let t=ex(SIM.MTBF*3600);t<H;t+=ex(SIM.MTBF*3600)){const d=ex(SIM.MTTR*60);down.push([t,t+d]);dt+=Math.min(d,H-t);t+=d;}
+      let ti=ex(1/lam),to=ex(1/lam),free=0,last=-1,h=0,di=0,inB=false,acc=0,lost=0,eps=0,busy=0;const deps=[],waits=[],trav=oneWay?60:45;
+      while(Math.min(ti,to)<H){
+        const dir=ti<=to?0:1,t=dir?to:ti;if(dir)to+=ex(1/lam);else ti+=ex(1/lam);
+        if(!dir){while(di<down.length&&down[di][1]<t)di++;if(di<down.length&&down[di][0]<=t)continue;}
+        while(h<deps.length&&deps[h]<=t)h++;
+        const n=deps.length-h;if(n>=SIM.BUF){if(!dir)lost++;continue;}
+        const st=Math.max(t,free),sv=SIM.PASS*(0.7+0.6*r())+(!oneWay&&last>=0&&dir!==last?SIM.SWITCH*(0.7+0.6*r()):0);
+        free=st+sv;last=dir;deps.push(free);waits.push(st-t);busy+=trav+(st-t)+sv;if(!dir)acc++;if(log)log.push([t,st,free,dir,n]);
+        if(!inB&&n+1>=SIM.BLOCKQ){eps++;inB=true;}else if(inB&&n+1<SIM.BLOCKQ/2)inB=false;
+      }
+      const w=waits.slice().sort((a,b)=>a-b),thr=acc*SIM.JPC/SIM.HOURS,A=Math.max(0,1-dt/H-lost/(lam*H)),oee=thr/SIM.IDEAL*SIM.Q;
+      return{thr,oee:oee*100,A:A*100,P:oee/(A*SIM.Q)*100,wait:waits.reduce((a,b)=>a+b,0)/waits.length,p95:w[Math.floor(w.length*.95)],eps,lost:lost*SIM.JPC,util:Math.min(100,busy/(SIM.FLEET*H)*100)};
+    }
+    function runN(demand,ow){const rs=[];for(let k=0;k<10;k++)rs.push(runDES(demand,ow,0x8F3A+k));const o={target:demand};
+      for(const f of Object.keys(rs[0])){const v=rs.map(x=>x[f]),m=v.reduce((a,b)=>a+b)/10,sd=Math.sqrt(v.reduce((a,b)=>a+(b-m)**2,0)/9);o[f]=m;o[f+'_ci']=2.262*sd/Math.sqrt(10);}return o;}
+    const R={baseline:runN(14200,false),base_oneway:runN(14200,true),surge_bidir:runN(19880,false),surge_oneway:runN(19880,true)};
+    const F=(x,d=0)=>x.toLocaleString(undefined,{maximumFractionDigits:d,minimumFractionDigits:d});
+    const C=(o,f,d=0,u='')=>`${F(o[f],d)}${u} <span class="text-slate-500">±${F(o[f+'_ci'],d)}</span>`;
+    function renderMatrix(){
+      const rows=[['Plant OEE (ideal '+F(SIM.IDEAL)+' jars/hr)','oee',1,'%'],['Throughput (jars/hr)','thr',0,''],['AGV fleet utilisation','util',0,'%'],['Node 4 mean wait','wait',1,' s'],['Node 4 p95 wait','p95',1,' s'],['Aisle-blocked episodes / 72h','eps',0,''],['Lost jars / 72h (dock full)','lost',0,'']];
+      const cols=['baseline','surge_bidir','surge_oneway','base_oneway'];
+      document.getElementById('matrix-body').innerHTML=rows.map(([n,f,d,u])=>`<tr><td class="p-2.5 font-sans font-semibold">${n}</td>${cols.map(c=>`<td class="p-2.5">${C(R[c],f,d,u)}</td>`).join('')}<td class="p-2.5 text-cyan-300">${F(R.surge_oneway[f]-R.surge_bidir[f],d)}${u}</td></tr>`).join('')+'<tr><td class="p-2.5 font-sans text-slate-400" colspan="6">Carbon, ZLD water and 5S scores are reference values, not simulated.</td></tr>';
+      ['baseline','surge_bidir','surge_oneway'].forEach(k=>{const o=R[k];document.getElementById('sub-'+k).textContent=`${F(o.thr)} jars/hr • ${F(o.wait,1)}s wait • ${F(o.oee,1)}% OEE`;});
+    }
+    renderMatrix();
+    function assign(L,ow){const tr=(ow?60:45)/2,fr=agvFleet.map(()=>-1e9),per=agvFleet.map(()=>[]);
+      L.forEach(([t,st,f,dir,n])=>{const a=t-tr,i=fr.findIndex(x=>x<=a);if(i<0)return;fr[i]=f+tr;per[i].push([a,t,st,f,f+tr,dir,n]);});return per;}
+    const REP={};[['baseline',14200,false],['surge_bidir',19880,false],['surge_oneway',19880,true]].forEach(([k,d,ow])=>{const L=[];runDES(d,ow,0x8F3A,L);REP[k]=assign(L.filter(e=>e[0]<3600),ow);});
+    const REPLAY=30,lerp=(a,b,f)=>a+(b-a)*Math.min(1,Math.max(0,f));let _lastRB=0;
+    function loopPos(u){u=((u%1)+1)%1;if(u<.25)return[58+u/.25*34,52];if(u<.5)return[92,52-(u-.25)/.25*34];if(u<.75)return[92-(u-.5)/.25*34,18];return[58,18+(u-.75)/.25*34];}
+    function jobPos(j,T,ow){const[a,t,st,fr,e,dir,n]=j,k=Math.min(7,n);
+      if(ow){const u0=.647,q=u0-.03*(k+1);return loopPos(T<t?lerp(u0-.45,q,(T-a)/(t-a)):T<st?q:T<fr?lerp(q,u0,(T-st)/(fr-st)):lerp(u0,u0+.45,(T-fr)/(e-fr)));}
+      const s=dir?1:-1,q=72+s*(6+2.2*k);return[T<t?lerp(72+s*32,q,(T-a)/(t-a)):T<st?q:T<fr?lerp(q,72,(T-st)/(fr-st)):lerp(72,72-s*32,(T-fr)/(e-fr)),35+(dir?1.4:-1.4)];}
+    function agvReplay(el){workersUpdate(el);const key=simState.scenario,ow=key==='surge_oneway',T=tick(el),P=REP[key];if(!P)return;
+      agvFleet.forEach((agv,i)=>{const js=P[i];let j=null;for(let q=0;q<js.length;q++){if(T>=js[q][0]&&T<js[q][4]){j=js[q];break;}if(js[q][0]>T)break;}
+        agv.group.visible=!!j;if(!j)return;const[x,z]=jobPos(j,T,ow);agv.group.position.set(x,0,z);
+        agv.beaconMat.color.setHex(T>=j[1]&&T<j[2]&&j[2]-j[1]>10?0xef4444:(ow?0x10b981:0x38bdf8));});
+      if(el-_lastRB>.25){_lastRB=el;const s=Math.floor(T);document.getElementById('replay-badge').textContent=`REPLAY ${simPaused?'PAUSED':simSpeed+'×'} · T+${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;}}
+    const ALM=[];
+    function alarmConds(){const c={},k=R[simState.scenario]||R.baseline,f=simState.faults;
+      if(f.roaster)c['ROAST-TIC-101']=[1,'Roast gas temp HIGH-HIGH 234.8 °C'];
+      if(f.hex)c['HEX-PDI-201']=[2,'HEX ΔP high 1.38 bar, CIP required'];
+      if(f.pack)c['PACK-LINE-01']=[2,'Packing line jam, 0 jars/min'];
+      if(k.wait>15)c['AGV-N4-WAIT']=[2,`Node 4 mean wait ${F(k.wait,1)} s`];
+      if(k.util>=95)c['AGV-FLEET-UTIL']=[2,`AGV fleet ${F(k.util)}% utilised`];
+      if(k.lost>0)c['DOCK-FULL']=[2,`Dock full, ${F(k.lost)} jars lost / 72h`];
+      if(k.eps>0)c['5S-AISLE']=[3,`${F(k.eps)} aisle_blocked episodes / 72h`];
+      workerAlarms(c);const q=QG.filter(g=>!g[4](g[3]())).length;if(q)c['QUAL-LOT-HOLD']=[1,`Lot on HOLD, ${q} quality gate(s) failed`];return c;}
+    function syncAlarms(){const c=alarmConds(),now=simAbs;
+      for(const id in c){const a=ALM.find(x=>x.id===id&&!x.rtn);if(a)a.txt=c[id][1];else ALM.unshift({id,pri:c[id][0],txt:c[id][1],ts:now,ack:false,rtn:null});}
+      ALM.forEach(a=>{if(!a.rtn&&!c[a.id])a.rtn=now;});ALM.length=Math.min(ALM.length,60);renderAlarms();ppeBadges();}
+    function renderAlarms(){const act=ALM.filter(a=>!a.rtn),n=p=>act.filter(a=>a.pri===p).length,tm=fmtT,now=simAbs;
+      document.getElementById('alm-head').textContent=`P1 ${n(1)} · P2 ${n(2)} · P3 ${n(3)} · unack ${act.filter(a=>!a.ack).length} · raised in last 10 sim-min ${ALM.filter(a=>now-a.ts<600).length}`;
+      document.getElementById('alm-rows').innerHTML=ALM.slice(0,7).map((a,i)=>`<div onclick="ackAlarm(${i})" class="flex gap-1.5 cursor-pointer ${a.rtn?'text-slate-500':a.pri===1?'text-rose-300':a.pri===2?'text-amber-300':'text-slate-300'} ${!a.ack&&!a.rtn?'font-bold':''}"><span>${tm(a.ts)}</span><span>P${a.pri}</span><span class="flex-1">${a.id} ${a.txt}</span><span>${a.rtn?'RTN':a.ack?'ACK':'NEW'}</span></div>`).join('')||'<div class="text-slate-500">No alarms</div>';}
+    function ackAlarm(i){if(i===-1)ALM.forEach(a=>a.ack=true);else if(ALM[i])ALM[i].ack=true;renderAlarms();}
+    function renderWaterfall(m){const r=R[m]||R.baseline,I=SIM.IDEAL,A=r.A/100,thr=r.thr,good=thr*SIM.Q;
+      const st=[['Ideal rate',I,0,1],['Availability loss (breakdowns, dock full)',I*(1-A),I*A,0],['Demand gap / below ideal rate',I*A-thr,thr,0],['Quality loss (Q 98%)',thr-good,good,0],['Good jars/hr',good,0,1]];
+      document.getElementById('waterfall').innerHTML=`<div class="text-[11px] font-mono text-slate-400 mb-1">OEE LOSS WATERFALL · ${m.replace('_',' ').toUpperCase()} · jars/hr vs ideal</div>`+st.map(([n,v,o,c])=>`<div class="flex items-center gap-2 text-[11px] font-mono"><span class="w-56 text-slate-400">${n}</span><div class="flex-1 h-3 bg-slate-900 rounded relative"><div class="absolute h-3 rounded ${c?'bg-cyan-500':'bg-amber-500'}" style="left:${o/I*100}%;width:${Math.max(.4,v/I*100)}%"></div></div><span class="w-20 text-right">${c?'':'−'}${F(v)}</span></div>`).join('');}
+    function toggleDocks(){document.querySelectorAll('aside').forEach(a=>a.classList.toggle('hidden'));}
+    addEventListener('keydown',e=>{if(e.key==='f'&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName))toggleDocks();});
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches)setCameraMode('free');
+    const CW=220,CH=120,_rt=[0,1,2,3].map(()=>new THREE.WebGLRenderTarget(CW,CH)),_px=new Uint8Array(CW*CH*4),_cams=[0,1,2,3].map(()=>new THREE.PerspectiveCamera(55,CW/CH,.5,900)),_idat={},_bx={};let _ci=0;
+    const CAMDEF=[['ROASTER-01','#f59e0b'],['HEX-SKID-01','#06b6d4'],['PACK-LINE-01','#6366f1'],[null,'#10b981']];
+    function assetBox(id){if(_bx[id])return _bx[id];scene.updateMatrixWorld(true);const b=new THREE.Box3();clickableMeshes.forEach(m=>{if(m.userData.assetId===id)b.expandByObject(m);});return _bx[id]=b;}
+    function projBox(b,cam,w,h){const v=new THREE.Vector3();let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9,ok=false;
+      for(let i=0;i<8;i++){v.set(i&1?b.max.x:b.min.x,i&2?b.max.y:b.min.y,i&4?b.max.z:b.min.z).project(cam);if(v.z>1)continue;ok=true;const x=(v.x*.5+.5)*w,y=(-v.y*.5+.5)*h;x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y);}
+      if(!ok||x1<0||y1<0||x0>w||y0>h)return null;const X=Math.max(0,x0),Y=Math.max(0,y0);return[X,Y,Math.min(w,x1)-X,Math.min(h,y1)-Y];}
+    function renderCctvFeeds(){const i=_ci++%4,cam=_cams[i],id=CAMDEF[i][0],cv=document.getElementById('cctv-cam-'+(i+1));if(!cv)return;
+      if(id){const b=assetBox(id);if(b.isEmpty())return;const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()),d=c.z>=0?1:-1;
+        cam.position.set(c.x,c.y+Math.max(s.y,6)*.8+8,c.z+d*(Math.max(s.x,s.z)*.9+14));cam.lookAt(c);}
+      else{cam.position.set(72,14,56);cam.lookAt(72,0,35);}
+      cam.updateMatrixWorld();
+      const o=renderer.getRenderTarget();renderer.setRenderTarget(_rt[i]);renderer.render(scene,cam);renderer.readRenderTargetPixels(_rt[i],0,0,CW,CH,_px);renderer.setRenderTarget(o);
+      const ctx=cv.getContext('2d'),im=_idat[i]||(_idat[i]=ctx.createImageData(CW,CH));
+      for(let y=0;y<CH;y++)im.data.set(_px.subarray((CH-1-y)*CW*4,(CH-y)*CW*4),y*CW*4);ctx.putImageData(im,0,0);
+      if(id){const r=projBox(assetBox(id),cam,CW,CH),a=assetDatabase[id];if(r)drawYoloBox(ctx,r[0],r[1],r[2],r[3],a.status!=='RUNNING'?'#ef4444':CAMDEF[i][1],id+' '+a.m1Val);}
+      else{let q=0;agvFleet.forEach(g=>{if(!g.group.visible)return;const r=projBox(new THREE.Box3().setFromObject(g.group),cam,CW,CH),red=g.beaconMat.color.getHex()===0xef4444;if(red)q++;if(r)drawYoloBox(ctx,r[0],r[1],r[2],r[3],red?'#ef4444':'#10b981',red?'WAIT':'AGV');});
+        ctx.fillStyle='#fff';ctx.font='10px monospace';ctx.fillText('Node 4 waiting: '+q,6,CH-16);}
+      const md=drawWorkers(ctx,cam,id||'WAREHOUSE-ASRS');ctx.fillStyle='rgba(255,255,255,.7)';ctx.font='9px monospace';ctx.fillText(md==='INFERENCE'?'CUSTOM DETECTOR (window.detectPPE)':'3D VIEW · GROUND-TRUTH BOXES, NO ML',6,CH-5);}
+    let simAbs=0,simClk=0,simSpeed=30,simPaused=false,scrubbing=false,_le2=0,_ls=-1,planOn=false,_ps=null;
+    function tick(el){const d=Math.min(.1,el-(_le2||el));_le2=el;if(!simPaused&&!scrubbing){simClk=(simClk+d*simSpeed)%3600;simAbs+=d*simSpeed;}
+      const s=Math.floor(simClk);if(s!==_ls){_ls=s;if(!scrubbing)document.getElementById('scrub').value=s;document.getElementById('tc-time').textContent=`T+${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;}return simClk;}
+    function renderTC(){[1,10,30,120].forEach(v=>{document.getElementById('tc-'+v).className='px-1.5 py-0.5 rounded border '+(v===simSpeed&&!simPaused?'bg-slate-600 border-slate-400 text-white font-bold':'bg-slate-900 border-slate-700 text-slate-300');});document.getElementById('tc-play').textContent=simPaused?'Play':'Pause';}
+    function setSpeed(v){simSpeed=v;simPaused=false;renderTC();}
+    function setPause(){simPaused=!simPaused;renderTC();}
+    function nextBlock(){const P=REP[simState.scenario];let b=1e9;P.forEach(js=>js.forEach(j=>{if(j[2]-j[1]>10&&j[1]>simClk+1&&j[1]<b)b=j[1];}));simClk=b<1e9?Math.max(0,b-8):0;}
+    renderTC();
+    const PZ=[['SILO-FARM-01','1 Silos'],['ROASTER-01','2 Roasters'],['EXTRACTOR-01','3 Extraction'],['HEX-SKID-01','4 HEX / Evap'],['DRYER-TOWER-01','5 Spray dryer'],['PACK-LINE-01','6 Packaging'],['WAREHOUSE-ASRS','7 Warehouse / AGV'],['POWERPLANT-CHP','8 CHP / ZLD']];
+    function zoneOf(id){return/^(ROAST|QUAL)/.test(id)?'ROASTER-01':/^HEX/.test(id)?'HEX-SKID-01':/^(PACK|DOCK)/.test(id)?'PACK-LINE-01':'WAREHOUSE-ASRS';}
+    function togglePlan(){planOn=!planOn;const ov=document.getElementById('plan-overlay');document.getElementById('plan-btn').textContent=planOn?'3D view':'Plan view';
+      if(planOn){_ps={m:simState.cameraMode,fov:camera.fov,fog:scene.fog,md:controls.maxDistance,pa:controls.maxPolarAngle};setCameraMode('free');scene.fog=null;camera.fov=20;camera.updateProjectionMatrix();
+        controls.maxDistance=1200;controls.minPolarAngle=0;controls.maxPolarAngle=0.001;controls.enableRotate=false;camera.position.set(0,720,0.01);controls.target.set(0,0,0);controls.update();
+        ov.innerHTML=PZ.map(([id],i)=>`<div id="pz-${i}" onclick="inspectAsset('${id}')"></div>`).join('');ov.classList.remove('hidden');}
+      else{scene.fog=_ps.fog;camera.fov=_ps.fov;camera.updateProjectionMatrix();controls.maxDistance=_ps.md;controls.maxPolarAngle=_ps.pa;controls.enableRotate=true;ov.classList.add('hidden');
+        if(_ps.m==='heli')setCameraMode('heli');else flyToZone('overview');}}
+    function updatePlan(){if(!planOn)return;const sev={};ALM.filter(a=>!a.rtn).forEach(a=>{const z=zoneOf(a.id);sev[z]=Math.min(sev[z]||9,a.pri);});
+      PZ.forEach(([id,n],i)=>{const el=document.getElementById('pz-'+i),b=assetBox(id);if(!el||b.isEmpty())return;const v=b.getCenter(new THREE.Vector3()).project(camera),s=sev[id],a=assetDatabase[id];
+        el.style.left=(v.x*.5+.5)*innerWidth+'px';el.style.top=(-v.y*.5+.5)*innerHeight+'px';
+        el.className='absolute -translate-x-1/2 -translate-y-1/2 px-2 py-1 rounded border text-[12px] font-mono cursor-pointer bg-slate-900 '+(s===1?'border-rose-500 text-rose-300 animate-pulse':s===2?'border-amber-400 text-amber-300':s===3?'border-amber-700 text-amber-200':'border-slate-500 text-slate-200');
+        el.innerHTML=`<b>${n}</b><br><span class="text-slate-400">${a.m1Label}: ${a.m1Val}</span>`;});}
+    setInterval(updatePlan,150);
+    const fmtT=s=>{s=Math.floor(s);return'T+'+String(Math.floor(s/3600)).padStart(2,'0')+':'+String(Math.floor(s/60)%60).padStart(2,'0')+':'+String(s%60).padStart(2,'0');};
+    const WK=[],WZ={'PACK-LINE-01':'Packaging','ROASTER-01':'Roasting','EXTRACTOR-01':'Extraction','HEX-SKID-01':'HEX','SILO-FARM-01':'Silos','POWERPLANT-CHP':'CHP','WAREHOUSE-ASRS':'Warehouse'};
+    const WDEF=[['W1','ROASTER-01','roast panel check',{helmet:1,vest:1},'stand'],['W2','EXTRACTOR-01','sampling rounds',{helmet:1,vest:1},'walk'],['W3','HEX-SKID-01','valve inspection',{helmet:1,vest:1},'stand'],
+      ['W4','PACK-LINE-01','QC inspection',{hairnet:1},'stand'],['W5','PACK-LINE-01','jar line operator (scripted: no hairnet)',{},'stand'],['W6','SILO-FARM-01','silo sampling',{helmet:1,vest:1},'walk'],
+      ['W7','POWERPLANT-CHP','CHP rounds',{helmet:1,vest:1},'walk'],['W8','WAREHOUSE-ASRS','crossing Node 4 aisle',{helmet:1,vest:1},'ped']];
+    function mkW([id,zone,act,ppe,mode],idx){const b=assetBox(zone);if(b.isEmpty())return;const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()),dz=c.z>=0?1:-1,fz=c.z+dz*(s.z/2+3);
+      const path=mode==='ped'?[[72,27],[72,43]]:mode==='walk'?[[c.x-s.x*.4,fz],[c.x+s.x*.4,fz]]:[[c.x+(idx%2?-1:1)*s.x*.2,fz],[c.x+(idx%2?-1:1)*s.x*.2,fz]];
+      const g=new THREE.Group(),add=(geo,col,y)=>{const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:col,roughness:.7}));m.position.y=y;m.castShadow=true;g.add(m);};
+      add(new THREE.CylinderGeometry(.28,.28,.8,8),0x1e293b,.4);add(new THREE.CylinderGeometry(.32,.36,.9,8),ppe.vest?0xf97316:(zone==='PACK-LINE-01'?0xf8fafc:0x3b82f6),1.25);add(new THREE.SphereGeometry(.22,10,8),0xe0b48a,1.9);
+      if(ppe.helmet)add(new THREE.SphereGeometry(.26,10,8,0,Math.PI*2,0,Math.PI/2),0xfacc15,1.93);else if(ppe.hairnet)add(new THREE.SphereGeometry(.25,10,8,0,Math.PI*2,0,Math.PI/2),0xffffff,1.93);
+      g.scale.setScalar(1.6);g.position.set(path[0][0],0,path[0][1]);scene.add(g);
+      WK.push({id,zone,zn:WZ[zone],act,ppe,mode,path,i:1,wait:0,ph:idx*1.7,ry:dz>0?Math.PI:0,ped:mode==='ped',g});}
+    WDEF.forEach(mkW);
+    let _wl=0;
+    function workersUpdate(el){const d=Math.min(.1,el-(_wl||el));_wl=el;if(simPaused)return;
+      WK.forEach(w=>{const p=w.g.position;if(w.mode==='stand'){w.g.rotation.y=w.ry+Math.sin(el*.6+w.ph)*.5;p.y=Math.abs(Math.sin(el*1.4+w.ph))*.03;return;}
+        if(w.wait>0){w.wait-=d;p.y=0;return;}const tg=w.path[w.i],dx=tg[0]-p.x,dz=tg[1]-p.z,L=Math.hypot(dx,dz),st=1.1*d;
+        if(L<=st){p.x=tg[0];p.z=tg[1];w.i=1-w.i;w.wait=3;}else{p.x+=dx/L*st;p.z+=dz/L*st;w.g.rotation.y=Math.atan2(dx,dz);p.y=Math.abs(Math.sin(el*8))*.06;}});}
+    function ppeViol(w){return w.zone==='PACK-LINE-01'?(w.ppe.hairnet?'':'NO HAIRNET'):!w.ppe.helmet?'NO HELMET':!w.ppe.vest?'NO VEST':'';}
+    function workerAlarms(c){WK.forEach(w=>{const v=ppeViol(w);if(v)c['PPE-'+w.id]=[2,`${w.id} ${v} (${w.act}, ${w.zn})`];
+      if(w.ped&&simState.scenario!=='surge_oneway'&&Math.abs(w.g.position.z-35)<2.5&&Math.abs(w.g.position.x-72)<6)c['PED-NODE4']=[1,`${w.id} crossing Node 4 AGV aisle`];});}
+    function ppeBadges(){const pk=WK.filter(w=>w.zone==='PACK-LINE-01'),ok=pk.filter(w=>!ppeViol(w)).length,rz=WK.filter(w=>w.zone==='ROASTER-01'&&ppeViol(w)).length;
+      const b3=document.getElementById('cctv-3-badge');if(b3&&!simState.faults.pack){b3.textContent=`● HAIRNET ${ok}/${pk.length}`;b3.className=ok<pk.length?'text-rose-400':'text-emerald-400';}
+      const b1=document.getElementById('cctv-1-badge');if(b1){b1.textContent=rz?'● PPE ALERT':'● PPE OK';b1.className=rz?'text-rose-400':'text-emerald-400';}}
+    function drawWorkers(ctx,cam,zone){if(window.detectPPE){try{const dets=window.detectPPE(ctx.getImageData(0,0,CW,CH),zone);if(dets){dets.forEach(d=>drawYoloBox(ctx,d.x,d.y,d.w,d.h,d.ok?'#10b981':'#ef4444',d.label));return'INFERENCE';}}catch(e){}}
+      WK.filter(w=>w.zone===zone).forEach(w=>{const r=projBox(new THREE.Box3().setFromObject(w.g),cam,CW,CH),v=ppeViol(w);if(r)drawYoloBox(ctx,r[0],r[1],r[2],r[3],v?'#ef4444':'#10b981',v||'PPE OK');});return'GROUND TRUTH';}
+    setInterval(syncAlarms,1000);
+    const RG={nodes:[],edges:[],bg:null,mode:'sel',src:null,res:null};
+    const RT={source:['Source',1e9,0],tank:['Tank/Silo',8000,6],pump:['Pump',2500,8],hex:['Heat exch.',4000,12],vessel:['Vessel',3000,16],valve:['Valve',6000,4],inst:['Instrument',9000,2],pack:['Packer',1500,3],sink:['Sink',1e9,0]};
+    const FM={tank:'bridging or level fault',pump:'seal, bearing or cavitation',hex:'fouling or tube leak',vessel:'trip on level or temperature',valve:'stuck or actuator fault',inst:'drift or false trip',pack:'jam or sensor fault'};
+    function rcaOpen(){document.getElementById('rca').classList.remove('hidden');if(!RG.nodes.length)rcaDemo();rcaDraw();}
+    function rcaClose(){document.getElementById('rca').classList.add('hidden');}
+    function rcaAdd(tag,type,x,y){RG.nodes.push({tag,type,x,y,mtbf:RT[type][1],mttr:RT[type][2]});}
+    function rcaDemo(){RG.nodes=[];RG.edges=[];RG.bg=null;RG.res=null;
+      [['FEED','source',40,170],['SILO-101','tank',150,170],['RS-201','vessel',270,170],['EX-301','vessel',390,170],['P-302A','pump',500,120],['P-302B','pump',500,220],['HX-401','hex',610,170],['SD-501','vessel',710,170],['PK-601','pack',710,290],['OUT','sink',590,340],['TT-401','inst',610,70],['LT-301','inst',390,70]].forEach(a=>rcaAdd(...a));
+      RG.edges=[[0,1],[1,2],[2,3],[3,4],[3,5],[4,6],[5,6],[6,7],[7,8],[8,9],[10,6],[11,3]];rcaDraw();document.getElementById('rca-out').innerHTML='';}
+    function rcaDraw(){const s=document.getElementById('rca-svg'),N=RG.nodes,top=RG.res?RG.res.rank:[];
+      s.innerHTML='<defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0L8,4L0,8z" fill="#94a3b8"/></marker></defs>'+(RG.bg?`<image id="rca-bg" href="${RG.bg}" width="800" height="420" preserveAspectRatio="xMidYMid meet" opacity=".6"/>`:'<rect id="rca-bg" width="800" height="420" fill="none"/>')
+      +RG.edges.map(([a,b])=>{const sg=N[a].type==='inst'||N[b].type==='inst';return `<line x1="${N[a].x}" y1="${N[a].y}" x2="${N[b].x}" y2="${N[b].y}" stroke="${sg?'#64748b':'#94a3b8'}" stroke-dasharray="${sg?'4 3':''}" marker-end="url(#ar)"/>`;}).join('')
+      +N.map((n,i)=>{const k=top.indexOf(i),c=k===0?'#ef4444':k>0&&k<3?'#f59e0b':RG.src===i?'#38bdf8':'#94a3b8';return `<g onclick="rcaClick(event,${i})" style="cursor:pointer"><rect x="${n.x-34}" y="${n.y-13}" width="68" height="26" rx="5" fill="#0b1220" stroke="${c}" stroke-width="${k>=0&&k<3?2.5:1.2}"/><text x="${n.x}" y="${n.y+4}" text-anchor="middle" font-size="11" fill="#e2e8f0">${n.tag}</text></g>`;}).join('');}
+    function rcaClick(e,i){e.stopPropagation();const m=RG.mode,n=RG.nodes[i];
+      if(m==='link'){if(RG.src===null)RG.src=i;else{if(RG.src!==i)RG.edges.push([RG.src,i]);RG.src=null;}}
+      else if(m==='del'){RG.nodes.splice(i,1);RG.edges=RG.edges.filter(([a,b])=>a!==i&&b!==i).map(([a,b])=>[a>i?a-1:a,b>i?b-1:b]);RG.res=null;}
+      else if(m==='sel'){const v=prompt(n.tag+': MTBF h, MTTR h',n.mtbf+','+n.mttr);if(v){const[a,b]=v.split(',').map(Number);if(a>0&&b>=0){n.mtbf=a;n.mttr=b;}}}
+      rcaDraw();}
+    document.getElementById('rca-svg').addEventListener('click',e=>{if(RG.mode!=='node')return;const s=e.currentTarget,p=s.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(s.getScreenCTM().inverse()),ty=document.getElementById('rca-type').value,tag=prompt('Tag for new '+RT[ty][0],ty.slice(0,2).toUpperCase()+'-'+(100+RG.nodes.length));if(tag){rcaAdd(tag,ty,Math.round(q.x),Math.round(q.y));rcaDraw();}});
+    document.getElementById('rca-file').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
+      if(f.type.startsWith('image/')){r.onload=()=>{RG.bg=r.result;RG.nodes=[];RG.edges=[];RG.res=null;RG.mode='node';rcaDraw();document.getElementById('rca-mode').value='node';document.getElementById('rca-out').innerHTML='';};r.readAsDataURL(f);}
+      else{r.onload=()=>{try{const j=JSON.parse(r.result);RG.nodes=j.nodes.map(n=>({...n,mtbf:n.mtbf||RT[n.type][1],mttr:n.mttr??RT[n.type][2]}));RG.edges=j.edges;RG.bg=null;RG.res=null;rcaDraw();}catch(x){alert('Invalid graph JSON');}};r.readAsText(f);}});
+    function rcaGraph(){const N=RG.nodes,adj={},insts={};RG.edges.forEach(([a,b])=>{const ia=N[a].type==='inst',ib=N[b].type==='inst';if(ia||ib){const i=ia?a:b,o=ia?b:a;(insts[i]=insts[i]||[]).push(o);}else(adj[a]=adj[a]||[]).push(b);});return{adj,insts};}
+    function rcaEff(F,g){const D=F.map(x=>x>0);RG.nodes.forEach((n,i)=>{if(n.type==='inst'&&F[i]>0)(g.insts[i]||[]).forEach(j=>D[j]=true);});return D;}
+    function rcaReach(D,g){const N=RG.nodes,seen=new Set(),q=[];N.forEach((n,i)=>{if(n.type==='source'&&!D[i]){seen.add(i);q.push(i);}});
+      while(q.length){const a=q.pop();(g.adj[a]||[]).forEach(b=>{if(!seen.has(b)&&!D[b]){seen.add(b);q.push(b);}});}return N.some((n,i)=>n.type==='sink'&&seen.has(i));}
+    function rcaSim(seed,g){const N=RG.nodes,r=rng(seed),H=4000,ev=[],F=N.map(()=>0),loss=N.map(()=>0);let last=0,dn=0;
+      N.forEach((n,i)=>{if(n.mtbf>=1e8)return;let t=-Math.log(1-r())*n.mtbf;while(t<H){const d=-Math.log(1-r())*n.mttr;ev.push([t,i,1],[t+d,i,0]);t+=d-Math.log(1-r())*n.mtbf;}});
+      ev.sort((a,b)=>a[0]-b[0]);
+      const seg=t=>{t=Math.min(t,H);const dt=t-last;if(dt>0&&!rcaReach(rcaEff(F,g),g)){dn+=dt;const cr=[];F.forEach((x,k)=>{if(!x)return;const G=F.slice();G[k]=0;if(rcaReach(rcaEff(G,g),g))cr.push(k);});const set=cr.length?cr:F.map((x,k)=>x?k:-1).filter(k=>k>=0);set.forEach(k=>loss[k]+=dt/set.length);}last=t;};
+      ev.forEach(([t,i,on])=>{if(t>=H)return;seg(t);F[i]+=on?1:-1;});seg(H);return{loss,dn};}
+    function rcaRun(){const N=RG.nodes;if(!N.some(n=>n.type==='source')||!N.some(n=>n.type==='sink')){alert('Add at least one Source and one Sink, and link the flow path between them.');return;}
+      const g=rcaGraph(),Rs=[];for(let k=0;k<20;k++)Rs.push(rcaSim(0x8F3A+k,g));
+      const loss=N.map((_,i)=>Rs.reduce((a,x)=>a+x.loss[i],0)/20),dn=Rs.reduce((a,x)=>a+x.dn,0)/20;
+      const spof=N.map((n,i)=>!['source','sink','inst'].includes(n.type)&&!rcaReach(rcaEff(N.map((_,k)=>+(k===i)),g),g));
+      const rank=N.map((_,i)=>i).filter(i=>loss[i]>0).sort((a,b)=>loss[b]-loss[a]);
+      RG.res={loss,dn,spof,rank,H:4000};rcaDraw();rcaReport(rank[0],{});}
+    function rcaRank(eff,E){const N=RG.nodes,R=RG.res,d=N.map(()=>9),adj=N.map(()=>[]);d[eff]=0;RG.edges.forEach(([a,b])=>{adj[a].push(b);adj[b].push(a);});const q=[eff];
+      while(q.length){const a=q.shift();adj[a].forEach(b=>{if(d[b]>d[a]+1){d[b]=d[a]+1;q.push(b);}});}
+      const w=[1,.6,.35],c=N.map((n,i)=>{if(d[i]>2||n.type==='source'||n.type==='sink')return null;let s=w[d[i]]*(1+R.loss[i]);if(n.type==='inst'&&E.inst)s*=2.5;if(E.start&&(n.type==='valve'||n.type==='pump'))s*=1.6;if(E.util&&(n.type==='pump'||n.type==='hex'))s*=1.4;return{i,s};}).filter(Boolean).sort((a,b)=>b.s-a.s),T=c.reduce((a,x)=>a+x.s,0)||1;
+      c.forEach(x=>x.p=x.s/T*100);return c;}
+    function fishbone(tag,Bn){const pos=[[60,45,'Machine'],[270,45,'Material'],[480,45,'Measurement'],[60,255,'Method'],[270,255,'Man'],[480,255,'Environment']];
+      let s=`<svg viewBox="0 0 800 300" class="w-full bg-slate-900 border border-slate-700 rounded mt-2"><line x1="30" y1="150" x2="650" y2="150" stroke="#94a3b8" stroke-width="3"/><rect x="650" y="125" width="140" height="50" rx="6" fill="#0b1220" stroke="#ef4444"/><text x="720" y="147" text-anchor="middle" font-size="11" fill="#e2e8f0">Downtime at</text><text x="720" y="164" text-anchor="middle" font-size="12" font-weight="bold" fill="#fca5a5">${tag}</text>`;
+      pos.forEach(([x,y,n])=>{const up=y<150;s+=`<line x1="${x}" y1="${y}" x2="${x+60}" y2="150" stroke="#94a3b8" stroke-width="2"/><text x="${x-4}" y="${up?y-8:y+18}" font-size="12" font-weight="bold" fill="#e2e8f0">${n}</text>`;
+        Bn[n].forEach((it,j)=>{const yy=up?y+30+j*28:y-22-j*28,xx=x+(yy-y)/(150-y)*60+6;s+=`<text x="${xx}" y="${yy}" font-size="11" fill="${it.includes('(check)')?'#94a3b8':'#fde68a'}">${it}</text>`;});});
+      return s+'</svg>';}
+    function rcaRe(){rcaReport(+document.getElementById('rca-eff').value,{inst:document.getElementById('ev-inst').checked,start:document.getElementById('ev-start').checked,util:document.getElementById('ev-util').checked});}
+    function rcaReport(eff,E){const R=RG.res,N=RG.nodes,tot=R.loss.reduce((a,b)=>a+b,0),o=document.getElementById('rca-out');
+      if(eff===undefined){o.innerHTML='<p class="mt-2">No plant downtime in the simulated horizon with these MTBF/MTTR values.</p>';return;}
+      const opts=N.map((n,i)=>['source','sink','inst'].includes(n.type)?'':`<option value="${i}" ${i===eff?'selected':''}>${n.tag}</option>`).join(''),ck=(id,k,l)=>`<label><input type="checkbox" id="${id}" onchange="rcaRe()" ${E[k]?'checked':''}> ${l}</label>`;
+      let h=`<div class="mt-2">Simulated plant availability <b>${F((1-R.dn/R.H)*100,1)}%</b> over ${R.H} h (mean of 20 seeded runs). Single points of failure: <b>${N.filter((n,i)=>R.spof[i]).map(n=>n.tag).join(', ')||'none'}</b></div><div class="mt-2 space-y-1">`
+      +R.rank.slice(0,6).map(i=>`<div class="flex items-center gap-2"><span class="w-24">${N[i].tag}</span><div class="flex-1 h-3 bg-slate-900 rounded"><div class="h-3 rounded bg-amber-500" style="width:${R.loss[i]/R.loss[R.rank[0]]*100}%"></div></div><span class="w-32 text-right">${F(R.loss[i],0)} h (${F(R.loss[i]/tot*100)}% of loss)</span></div>`).join('')
+      +`</div><div class="mt-3 flex flex-wrap items-center gap-3">Stopped unit: <select id="rca-eff" class="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-200" onchange="rcaRe()">${opts}</select>${ck('ev-inst','inst','instrument reading abnormal')}${ck('ev-start','start','at start-up / after maintenance')}${ck('ev-util','util','utility dip')}</div>`;
+      const c=rcaRank(eff,E),tp=(f,k)=>c.filter(x=>f(N[x.i])).slice(0,k).map(x=>`${N[x.i].tag} ${F(x.p)}%`),
+        Bn={Machine:tp(n=>['pump','hex','vessel','valve','pack'].includes(n.type),3),Material:tp(n=>n.type==='tank',2),Measurement:tp(n=>n.type==='inst',2),Method:[E.start?'Start-up SOP (check)':'CIP/changeover (check)'],Man:['Alarm response (check)'],Environment:[E.util?'Steam/power dip (check)':'Utility stability (check)']};
+      if(!Bn.Material.length)Bn.Material=['Feed quality (check)'];if(!Bn.Measurement.length)Bn.Measurement=['Calibration (check)'];if(!Bn.Machine.length)Bn.Machine=['No equipment candidates'];
+      const top=c[0]?N[c[0].i]:N[eff];
+      h+=fishbone(N[eff].tag,Bn)+`<p class="mt-1 text-slate-400">Yellow = ranked from the simulation and P&amp;ID neighbourhood. Grey "(check)" items are prompts for the team, not computed.</p><div class="mt-2"><b>5-Why prompts</b><ol class="list-decimal ml-5 space-y-0.5"><li>Why did ${N[eff].tag} stop? Most likely ${top.tag} (${c[0]?F(c[0].p):'-'}%).</li><li>Why did ${top.tag} fail? Typical modes: ${FM[top.type]||'check history'}.</li><li>Why was it not detected or prevented? (PM plan, condition monitoring)</li><li>Why did protection or response not limit the stop? (standby, spares, alarm)</li><li>Why does the system allow it? (design, SOP, MOC)</li></ol></div>`;
+      o.innerHTML=h;}
+    const _ss=window.setScenario;
+    window.setScenario=function(m){_ss(m);const r=R[m];if(!r)return;Object.assign(simState.kpis,{oee:r.oee,throughput:Math.round(r.thr),target:r.target,agvWait:r.wait,agvUtil:Math.round(r.util),violations5s:Math.round(r.eps)});refreshHudKpis();document.getElementById('kpi-oee-delta').textContent=`A:${F(r.A)}% P:${F(r.P)}% Q:${SIM.Q*100}%`;renderWaterfall(m);syncAlarms();};
+    setScenario(simState.scenario);
+
+    window.onload = () => {
+      refreshHudKpis();
+      animate();
+    };
+  </script>
+</body>
+</html>
